@@ -24,6 +24,7 @@
                 :components ((:file "items")
                              (:file "linebreak")
                              (:file "setglue")
+                             (:file "jfm")
                              (:file "layout")
                              (:file "ttf-subset")
                              (:file "tounicode")))))

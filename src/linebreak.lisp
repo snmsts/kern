@@ -15,7 +15,9 @@
 
 (defstruct (break-params (:conc-name param-))
   ;; badness がこれを超える分割候補は捨てる。TeX の \tolerance。
-  ;; ★和文は全文字間が breakpoint なので、ここで刈らないと active node が膨らむ。
+  ;; ★これは品質の閾値であって、計算量の主因ではない (実測)。
+  ;;   active node を支配していたのは候補の鍵に行番号を含めるかどうかだった。
+  ;;   uniform-width の項を参照。
   (tolerance 200)
   ;; 行数を増やすことのコスト。TeX の \linepenalty。
   (line-penalty 10)
@@ -126,6 +128,16 @@
   (let* ((items (coerce (finish-paragraph items) 'vector))
          (n (length items))
          (width-fn (if (functionp line-width) line-width (constantly line-width)))
+         ;; ★行幅が一定なら、候補を行番号で分ける必要がない。
+         ;;   行番号を鍵に含めるのは (a) 行ごとに幅が変わる場合 (回り込み) と
+         ;;   (b) TeX の \looseness のように行数そのものを操作したい場合だけ。
+         ;;   最小 demerits だけが目的なら、行数の差は line-penalty が既に勘定している。
+         ;;   ここを分けると到達可能な行数の広がりぶん active が膨らみ、
+         ;;   長い段落で計算量が二乗になる。
+         (uniform-width (not (functionp line-width)))
+         (max-active 1)        ; active node 数の最大 (刈り込みが効いているかの指標)
+         (n-breakpoints 0)     ; 検討した分割候補の数
+         (n-edges 0)           ; (node, breakpoint) の組み合わせを見た回数
          ;; 累積和。w[i] = items[0..i-1] の advance の合計。
          ;; 行の材料は [node-after(a), b) なので、差で取れる。
          (w  (make-array (1+ n) :initial-element 0))
@@ -143,6 +155,7 @@
     (let ((active (list (make-node :position 0 :line 0 :fitness 2 :after 0))))
       (dotimes (b n)
         (when (legal-breakpoint-p items b)
+          (incf n-breakpoints)
           (let* ((item (aref items b))
                  (forced (forced-break-p items b))
                  (pen (if (typep item 'penalty) (penalty-value item) 0))
@@ -151,6 +164,7 @@
                  (survivors '())
                  (deactivated '()))
             (dolist (a active)
+              (incf n-edges)
               (let* ((from (node-after a))
                      (natural (- (aref w b) (aref w from)))
                      (st  (- (aref y b)  (aref y from)))
@@ -167,24 +181,26 @@
                 ;; 実行可能なら候補に入れる
                 (when (and (<= -1 r) (<= bad (param-tolerance params)))
                   (let* ((fit (fitness-class r))
-                         (key (list line fit))
+                         (key (if uniform-width fit (list line fit)))
                          (d (+ (node-demerits a)
                                (compute-demerits bad pen flagged (node-flagged a)
                                                  fit (node-fitness a) params)))
                          (cur (gethash key candidates)))
                     (when (or (null cur) (< d (first cur)))
-                      (setf (gethash key candidates) (list d a r fit)))))))
+                      (setf (gethash key candidates) (list d a r fit line)))))))
             ;; 生き残りに、この breakpoint で作った新しい node を足す
             (let ((new '())
                   (after (skip-discardables items (1+ b))))
               (maphash (lambda (key val)
-                         (destructuring-bind (d a r fit) val
-                           (push (make-node :position b :line (first key) :fitness fit
+                         (declare (ignore key))
+                         (destructuring-bind (d a r fit line) val
+                           (push (make-node :position b :line line :fitness fit
                                             :after after :demerits d :ratio r
                                             :flagged flagged :previous a)
                                  new)))
                        candidates)
               (setf active (nconc new survivors))
+              (setf max-active (max max-active (length active)))
               ;; 保険: 全滅したら、落とした node のうち最も筋の良いものから強制的に切る。
               ;; TeX は tolerance を上げて組み直す多段構成だが、ここでは1行だけ諦める。
               ;; (\hfil + 強制分割で終わるので、最終分割では起きないはず)
@@ -199,9 +215,16 @@
       (let ((best (first (sort (copy-list active) #'< :key #'node-demerits))))
         (unless best
           (error "行分割に失敗した (active node が空)"))
-        (nreverse
-         (loop for node = best then (node-previous node)
-               while (and node (node-previous node))
-               collect (list :position (node-position node)
-                             :ratio (node-ratio node)
-                             :line (node-line node))))))))
+        (values
+         (nreverse
+          (loop for node = best then (node-previous node)
+                while (and node (node-previous node))
+                collect (list :position (node-position node)
+                              :ratio (node-ratio node)
+                              :line (node-line node))))
+         ;; 第2値: 刈り込みが効いているかを見るための統計
+         (list :items n
+               :breakpoints n-breakpoints
+               :max-active max-active
+               :edges n-edges
+               :demerits (node-demerits best)))))))

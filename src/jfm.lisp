@@ -172,6 +172,7 @@
   (number 0)
   (chars '())           ; 文字コードの list と、'parbdd 等のシンボル
   (width 1) (height 0) (depth 0)
+  (align nil)           ; "left"/"right"/"middle" — 字面が枠のどちら寄りか
   (glue (make-hash-table)))   ; 相手クラス番号 → jfm-glue
 
 (defparameter *char-tokens*
@@ -209,7 +210,8 @@
         (jc (make-jfm-class :number number
                             :width  (or (lt-get lt "width") 1)
                             :height (or (lt-get lt "height") 0)
-                            :depth  (or (lt-get lt "depth") 0))))
+                            :depth  (or (lt-get lt "depth") 0)
+                            :align  (lt-get lt "align"))))
     (when chars-lt
       (setf (jc-chars jc) (parse-chars (lt-pos chars-lt))))
     (when glue-lt
@@ -306,8 +308,17 @@
   (line-end-forbidden (make-hash-table)))
 
 (defun char-class-of (rs code)
-  "文字コードのクラス番号。未登録は 0 (漢字等)。"
-  (gethash code (rs-char->class rs) 0))
+  "文字コードのクラス番号。
+
+   ★JFM の欧文クラス (27) は chars = {'alchar'} という特殊トークンで、
+     個別の文字を列挙しない。'alchar' は『全ラテン文字』を表すマクロ。
+     なので ASCII 範囲 (制御・空白を除く) を欧文クラス 27 に落とす。
+     和字間隔・全角記号などは別途 JFM に登録されているのでそちらが優先。
+   ★それ以外の未登録は 0 (漢字等)。"
+  (let ((registered (gethash code (rs-char->class rs))))
+    (cond (registered registered)
+          ((<= #x21 code #x7E) 27)      ; ASCII 図形文字 = alchar
+          (t 0))))
 
 (defun class-glue (rs class-a class-b)
   "クラス A の後、クラス B の前に入る jfm-glue。無ければ NIL。"

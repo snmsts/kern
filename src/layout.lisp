@@ -48,6 +48,22 @@
    jfm-jlreq のコメント: 4,9,10,11,15,16,19(=0) との間は (x)kanjiskip。"
   (member class '(0 4 9 10 11 15 16)))
 
+(defun class-glyph-width (rs class size)
+  "そのクラスの字面幅 (JFM の width)。約物は 0.5em 等。
+   フォントの実送り幅ではなく JFM 上の枠幅を返す。全角なら 1。"
+  (let ((c (gethash class (rs-classes rs))))
+    (if c (* size (jc-width c)) size)))
+
+(defun class-align (rs class)
+  "字面が全角枠のどちら寄りか。'left / 'right / 'middle / NIL。
+   JFM の align。描画時に字面をどこに置くかに使う。"
+  (let ((c (gethash class (rs-classes rs))))
+    (when c
+      (let ((a (jc-align c)))
+        (cond ((equal a "left") :left)
+              ((equal a "right") :right)
+              ((equal a "middle") :middle))))))
+
 (defun inter-glue (rs class-a class-b size)
   "A と B のあいだに入れる glue。まず JFM のクラス対表を引き、
    無ければ kanjiskip / xkanjiskip にフォールバックする。"
@@ -80,29 +96,66 @@
      penalty を glue の【前】に置くと、glue も penalty 自身も分割点でなくなる。"
   (let ((rs ruleset)
         (n (length codes))
-        (items '()))
-    (dotimes (i n)
-      (let* ((c (aref codes i))
-             (class (char-class-of rs c)))
-        (if (= c #x20)
-            ;; 欧文の単語間。フォントの空白幅を自然幅にする
-            (let ((w (glyph-advance font (code-char c) size)))
-              (push (make-glue w :stretch (/ w 2) :shrink (/ w 3)
-                                 :source-start i :source-end (1+ i))
-                    items))
-            (push (make-glyph-box (glyph-advance font (code-char c) size)
-                                  (string (code-char c))
-                                  :source-start i :source-end (1+ i))
-                  items))
-        (when (< (1+ i) n)
-          (let* ((next (aref codes (1+ i)))
-                 (next-class (char-class-of rs next))
-                 (forbid (and kinsoku (forbid-break-p rs c next)))
-                 (glue (unless (or (= c #x20) (= next #x20))
-                         (inter-glue rs class next-class size))))
-            (when (and forbid glue)
-              (push (make-penalty +inf-penalty+) items))
-            (when glue (push glue items))))))
+        (items '())
+        (i 0))
+    (flet ((emit-char (c class start end)
+             ;; ★box の advance は JFM の字面幅 (約物なら 0.5em)。残りのアキは
+             ;;   クラス対 glue が持つ。フォントの実グリフは全角枠に入っているので、
+             ;;   字面が枠内で寄っているぶん align に応じて描画位置をずらす。
+             (let* ((full (glyph-advance font (code-char c) size))
+                    (face (class-glyph-width rs class size))
+                    (slack (- full face))
+                    (offset (case (class-align rs class)
+                              (:right (- slack))
+                              (:middle (- (/ slack 2)))
+                              (t 0))))
+               (make-glyph-box face (string (code-char c))
+                               :glyph-offset offset
+                               :source-start start :source-end end))))
+      (loop while (< i n)
+            for c = (aref codes i)
+            for class = (char-class-of rs c)
+            do (cond
+                 ;; 欧文の単語間
+                 ((= c #x20)
+                  (let ((w (glyph-advance font (code-char c) size)))
+                    (push (make-glue w :stretch (/ w 2) :shrink (/ w 3)
+                                       :source-start i :source-end (1+ i))
+                          items))
+                  (incf i))
+                 ;; ★ラテンの連なりは1つの box にまとめる。
+                 ;;   1文字ずつ box にすると全文字間が分割点になり、
+                 ;;   欧単語が途中で改行されてしまう。
+                 ((latin-class-p rs class)
+                  (let ((start i)
+                        (str (make-string-output-stream))
+                        (w 0))
+                    (loop while (and (< i n)
+                                     (latin-class-p rs (char-class-of rs (aref codes i)))
+                                     (/= (aref codes i) #x20))
+                          for ch = (aref codes i)
+                          do (write-char (code-char ch) str)
+                             (incf w (glyph-advance font (code-char ch) size))
+                             (incf i))
+                    (push (make-glyph-box w (get-output-stream-string str)
+                                          :source-start start :source-end i)
+                          items)))
+                 ;; 和文の1文字
+                 (t
+                  (push (emit-char c class i (1+ i)) items)
+                  (incf i)))
+               ;; 直後の文字とのあいだの glue / 禁則
+               (when (< i n)
+                 (let* ((prev (aref codes (1- i)))
+                        (prev-class (char-class-of rs prev))
+                        (next (aref codes i))
+                        (next-class (char-class-of rs next))
+                        (forbid (and kinsoku (forbid-break-p rs prev next)))
+                        (glue (unless (or (= prev #x20) (= next #x20))
+                                (inter-glue rs prev-class next-class size))))
+                   (when (and forbid glue)
+                     (push (make-penalty +inf-penalty+) items))
+                   (when glue (push glue items))))))
     (nreverse items)))
 
 ;;; ---------------------------------------------------------------------------
@@ -137,7 +190,8 @@
                   for k from 0
                   for item = (aref items i)
                   do (cond ((typep item 'glyph-box)
-                            (push (cons x (box-glyphs item)) glyphs))
+                            ;; 描画位置は box 左端 + 字面オフセット
+                            (push (cons (+ x (glyph-offset item)) (box-glyphs item)) glyphs))
                            ((and (typep item 'glue) (plusp (aref sizes k)))
                             (push (cons x (aref sizes k)) gaps)))
                      (incf x (aref sizes k)))

@@ -13,7 +13,7 @@
   (:export #:len
            #:item #:source-start #:source-end #:advance #:discardable-p
            #:box #:ascent #:descent #:protrusion
-           #:glyph-box #:box-font #:box-glyphs
+           #:glyph-box #:box-font #:box-glyphs #:glyph-offset
            #:glue #:stretch #:shrink #:stretch-order #:shrink-order
            #:stretch-priority #:shrink-priority #:glue-ratio
            #:penalty #:penalty-value #:flagged-p
@@ -73,7 +73,13 @@
    ;; ★入口は「文字」ではなく「整形済みグリフ列」。
    ;;   シェーピングは実装しないので当面ここには文字がそのまま入るが、
    ;;   型をグリフ列にしておくと将来 HarfBuzz を噛ませる合流点が確保される。
-   (glyphs :initarg :glyphs :initform nil :accessor box-glyphs)))
+   (glyphs :initarg :glyphs :initform nil :accessor box-glyphs)
+   ;; ★字面のオフセット。box の advance は JFM の字面幅 (約物なら 0.5em) だが、
+   ;;   フォントの実グリフは全角の枠に入っている。align に応じて、枠内での
+   ;;   描画位置を box の左端からずらす。
+   ;;   例: 句点 (align=left) は字面が枠の左寄り = オフセット 0。
+   ;;       始め括弧 (align=right) は字面が右寄り = 実グリフを左へ引く負のオフセット。
+   (glyph-offset :initarg :glyph-offset :initform 0 :accessor glyph-offset :type len)))
 
 ;;; ---------------------------------------------------------------------------
 ;;; glue -- 伸縮する空き。均等割りの担い手。

@@ -118,14 +118,16 @@
 ;;; 本体
 ;;; ---------------------------------------------------------------------------
 
-(defun break-paragraph (items line-width &key (params (make-break-params)))
+(defun break-paragraph (items line-width &key (params (make-break-params)) (finish t))
   "ITEMS を行に分割する。LINE-WIDTH は数か、行番号を取る関数。
    返り値は分割の並び: 各要素が (:position P :ratio R :line N)。
 
    動的計画法。active node が『まだ続きうる分割の候補』で、
    各 breakpoint で全 active node から接続を試し、
    実行可能なものを (行番号, fitness) ごとに最良1つだけ残す。"
-  (let* ((items (coerce (finish-paragraph items) 'vector))
+  ;; FINISH が偽なら既に finish-paragraph 済みとみなす。
+  ;; 呼び出し側が同じ item 列で位置を数える (レイアウト) ときに二重に締めないため。
+  (let* ((items (coerce (if finish (finish-paragraph items) items) 'vector))
          (n (length items))
          (width-fn (if (functionp line-width) line-width (constantly line-width)))
          ;; ★行幅が一定なら、候補を行番号で分ける必要がない。

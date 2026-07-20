@@ -17,7 +17,7 @@
 
 (defsystem "typeset"
   :description "Japanese-capable typesetting engine (working title)"
-  :license "BSD-2-Clause"
+  :license "MIT"
   :depends-on ()
   :serial t
   :components ((:module "src"
@@ -32,7 +32,7 @@
 
 (defsystem "typeset/pdf"
   :description "cl-pdf backend"
-  :license "BSD-2-Clause"
+  :license "MIT"
   :depends-on ("typeset" "cl-pdf")
   :serial t
   :components ((:module "src"
@@ -40,7 +40,7 @@
 
 (defsystem "typeset/demo"
   :description "Demonstrations and measurements"
-  :license "BSD-2-Clause"
+  :license "MIT"
   :depends-on ("typeset/pdf")
   :serial t
   :components ((:module "demo"

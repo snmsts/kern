@@ -1,0 +1,9 @@
+# cl-pdf は独立した clone (origin = mbattyani/cl-pdf, branch local-fixes)。
+# 独自の履歴を持つのでこのリポジトリには入れない。フォークとして分離する予定。
+vendor/
+
+# 生成物
+*.pdf
+*.fasl
+*.dx32fsl
+*.dx64fsl

@@ -25,6 +25,7 @@
                              (:file "linebreak")
                              (:file "setglue")
                              (:file "jfm")
+                             (:file "uax14")
                              (:file "layout")
                              (:file "ttf-subset")
                              (:file "tounicode")))))

@@ -118,6 +118,19 @@
             (format out "~a~%" (line-text l :threshold (/ size 5)))))
         (format t "  行のテキスト: ~a~%" txt))
 
+      ;; ★フォントのサブセット化。cl-pdf に手を入れず binary-data を差し替える
+      (let ((gids (gids-for-codes fm codes)))
+        (multiple-value-bind (after before) (install-subset fm *ttf* codes)
+          (format t "  サブセット : ~:d → ~:d bytes (~,2f%)  使用グリフ ~d~%"
+                  before after (* 100.0 (/ after before)) (length gids)))
+        ;; 作ったフォントを読み直して検算する
+        (multiple-value-bind (ok report) (verify-subset (pdf::binary-data fm) gids)
+          (format t "  検算       : ~a  (glyf ~:d bytes / 中身のあるグリフ ~d/~d)~%"
+                  (if ok "OK" "NG")
+                  (getf report :glyf-bytes) (getf report :non-empty) (getf report :wanted))
+          (dolist (p (getf report :problems))
+            (format t "               ! ~a~%" p))))
+
       ;; PDF 出力
       (let ((pdf-path (merge-pathnames "demo/ja-typeset.pdf" *base*)))
         (pdf:with-document ()

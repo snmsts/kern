@@ -49,6 +49,18 @@
 (defun make-buf (&optional (n 0))
   (make-array n :element-type '(unsigned-byte 8) :adjustable t :fill-pointer 0))
 
+(defun to-simple-octets (v)
+  "調整可能ベクタを単純ベクタに複製する。
+
+   ★(coerce v '(vector (unsigned-byte 8))) では駄目。
+     fill-pointer 付きの調整可能ベクタは既にその型を満たしているので
+     COERCE は何もせず同じオブジェクトを返す。
+     salza2 など (simple-array (unsigned-byte 8) (*)) を要求する相手に渡すと
+     TYPE-ERROR になる。非圧縮の経路では素通りするので露見しにくい。"
+  (let ((r (make-array (length v) :element-type '(unsigned-byte 8))))
+    (replace r v)
+    r))
+
 ;;; ---------------------------------------------------------------------------
 ;;; テーブル一覧
 ;;; ---------------------------------------------------------------------------
@@ -188,8 +200,8 @@
           (dolist (tag *keep-tables*)
             (let ((b (table-bytes v tables tag)))
               (when b (push (cons tag b) out-tables))))
-          (push (cons "glyf" (coerce new-glyf '(vector (unsigned-byte 8)))) out-tables)
-          (push (cons "loca" (coerce new-loca '(vector (unsigned-byte 8)))) out-tables)
+          (push (cons "glyf" (to-simple-octets new-glyf)) out-tables)
+          (push (cons "loca" (to-simple-octets new-loca)) out-tables)
           (setf out-tables (sort out-tables #'string< :key #'car))
           (build-font out-tables))))))
 
@@ -224,7 +236,7 @@
         (wr-bytes out bytes)
         (loop while (plusp (mod (fill-pointer out) 4))
               do (vector-push-extend 0 out))))
-    (let ((v (coerce out '(vector (unsigned-byte 8)))))
+    (let ((v (to-simple-octets out)))
       ;; head.checkSumAdjustment を 0 にしてから各表の checksum を計算する
       (when head-pos
         (loop for i from 0 below 4 do (setf (aref v (+ head-pos 8 i)) 0)))

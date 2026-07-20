@@ -230,6 +230,30 @@ CJK Unified Ideographs     in font: 12721   lost:   252  (2.0%)
                    (aref c2g (1+ (* 2 code))) (code-char (logand gid #xFF)))))
 ```
 
+#### 圧縮は既定で無効 (2026-07-20 追記)
+
+cl-pdf は zlib 圧縮の機構を持っているが `cl-pdf.asd` の既定が `:use-no-zlib`。
+salza2 を使うには **`.asd` が読まれる前に** feature を立てる必要がある:
+
+```lisp
+(pushnew :use-salza2-zlib *features*)
+;; feature が変わったので強制再コンパイル
+(asdf:load-system :cl-pdf :force t)
+(setf pdf:*compress-streams* t)   ; 既定 nil。*compress-fonts* は既定 t
+```
+
+効果 (249 文字の和文 1 ページ):
+
+```
+13,540,421  最初 (フォント丸ごと・非圧縮)
+   691,715  サブセット化のみ
+   439,212  + zlib 圧縮        ← 31 倍削減
+```
+
+★注意: 圧縮を有効にすると、埋め込むバイト列が
+`(simple-array (unsigned-byte 8) (*))` でないと salza2 が TYPE-ERROR を出す。
+非圧縮経路では素通りするので、圧縮を切っていると露見しない。
+
 #### バグ 3 (というより欠落): サブセット化が無い
 
 `zpb-ttf-load.lisp:113-121` が .ttf を丸ごと読んで埋め込む。

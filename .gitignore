@@ -7,3 +7,5 @@ vendor/
 *.fasl
 *.dx32fsl
 *.dx64fsl
+demo/extracted.txt
+demo/out-lines.txt

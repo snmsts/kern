@@ -75,6 +75,30 @@
           (pdf::length1 fm) (length subset))
     (values (length subset) before)))
 
+;;; --- /ToUnicode を cl-pdf のフォント辞書に注入する ---
+
+(defun install-tounicode (font codes)
+  "FONT (pdf:get-font が返すもの) の Type0 辞書に /ToUnicode CMap を足す。
+   これで PDF が検索・コピペ・支援技術に対応する。
+
+   ★cl-pdf は無改造。find-font-object がフォントを *document* に登録し、
+     その content が make-dictionary の作った Type0 辞書なので、そこへ
+     add-dict-value するだけ。
+   ★フォントを登録させるため、一度ページ内で使われた後に呼ぶこと
+     (draw-lines のあと)。まだ登録されていなければ何もしない。"
+  (let ((fo (cdr (assoc font (pdf::fonts pdf::*document*)))))
+    (when fo
+      (let ((dict (pdf::content fo))
+            (cmap (tounicode-cmap codes)))
+        (unless (pdf::get-dict-value dict "/ToUnicode")
+          (pdf::add-dict-value
+           dict "/ToUnicode"
+           (make-instance 'pdf::indirect-object
+                          :content (make-instance 'pdf::pdf-stream
+                                                  :content cmap
+                                                  :no-compression (not pdf:*compress-streams*)))))
+        cmap))))
+
 (defun draw-measure-rules (lines size &key (x 60) (y 760) (width 0)
                                            (line-pitch (* size 17/10)))
   "版面の左右端に細い罫線を引く。行末が揃っているかの目視確認用。"

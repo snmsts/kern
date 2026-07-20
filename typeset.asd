@@ -25,7 +25,8 @@
                              (:file "linebreak")
                              (:file "setglue")
                              (:file "layout")
-                             (:file "ttf-subset")))))
+                             (:file "ttf-subset")
+                             (:file "tounicode")))))
 
 (defsystem "typeset/pdf"
   :description "cl-pdf backend"

@@ -141,7 +141,10 @@
         (pdf:with-document ()
           (pdf:with-page ()
             (draw-measure-rules lines size :x 60 :y 760 :width width)
-            (draw-lines lines font size :x 60 :y 760))
+            (draw-lines lines font size :x 60 :y 760)
+            ;; ★draw-lines のあと (フォントが登録された後) に /ToUnicode を注入。
+            ;;   逆写像がタダで効く場所。検索・コピペが可能になる。
+            (install-tounicode font codes))
           (pdf:write-document pdf-path))
         (format t "  PDF        : ~a (~:d bytes)~%" pdf-path
                 (with-open-file (in pdf-path :element-type '(unsigned-byte 8))

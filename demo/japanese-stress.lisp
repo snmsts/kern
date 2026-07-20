@@ -27,14 +27,14 @@
 ;;;   句読点・閉じ括弧は全角枠に字面が寄り、【後ろ】に半角アキ
 ;;;   開き括弧は全角枠に字面が寄り、【前】に半角アキ
 ;;; そのアキは詰められる (= 追い込みの原資)。本物は約25クラスの対表。
-(defun space-after (code)
+(defun stress-space-after (code)
   (if (member code '(#x3002 #x3001 #x300D #x300F #xFF09)) 1/2 0))
-(defun space-before (code)
+(defun stress-space-before (code)
   (if (member code '(#x300C #x300E #xFF08)) 1/2 0))
 
-(defun char-advance (code)
+(defun stress-char-advance (code)
   "字面の幅。前後のアキを引いた残り。全角なら 1、約物なら 1/2。"
-  (- 1 (space-after code) (space-before code)))
+  (- 1 (stress-space-after code) (stress-space-before code)))
 
 (defparameter *kanjiskip-stretch* 1/4
   "jfm-jlreq.lua: kanjiskip = {0, 0.25, 0}。自然幅 0、伸びのみ、縮みなし。")
@@ -59,12 +59,12 @@
         (items '()))
     (dotimes (i n)
       (let ((c (aref codes i)))
-        (push (make-glyph-box (char-advance c) (string (code-char c))
+        (push (make-glyph-box (stress-char-advance c) (string (code-char c))
                               :source-start i :source-end (1+ i))
               items)
         (when (< (1+ i) n)
           (let* ((next (aref codes (1+ i)))
-                 (gap (+ (space-after c) (space-before next)))
+                 (gap (+ (stress-space-after c) (stress-space-before next)))
                  (forbid (and kinsoku
                               (or (member next *line-start-forbidden*)
                                   (member c *line-end-forbidden*)))))

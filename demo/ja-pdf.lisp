@@ -6,8 +6,13 @@
 
 (in-package #:typeset)
 
-(defparameter *base* #P"C:/msys64/home/snmst/work/nanka/")
-(defparameter *ttf* #P"C:/Windows/Fonts/yumin.ttf")
+(defun rel (path)
+  "システムからの相対パス。絶対パスを埋め込まないため。"
+  (asdf:system-relative-pathname "typeset" path))
+
+(defparameter *ttf* #P"C:/Windows/Fonts/yumin.ttf"
+  "游明朝。Windows に素の .ttf で入っている数少ない和文フォント
+   (他はほぼ .ttc で zpb-ttf が読めない)。")
 
 (defun read-codes (path)
   "UTF-8 のファイルを読み、改行を除いたコードポイントの配列にする。"
@@ -48,7 +53,7 @@
 
 (defun diagnose (&key (size 21/2) (chars-per-line 24))
   "均等割りが版面幅にぴったり合わない行を突き止める。"
-  (let* ((codes (read-codes (merge-pathnames "demo/sample-ja.txt" *base*)))
+  (let* ((codes (read-codes (rel "demo/sample-ja.txt")))
          (fm (pdf:load-ttf-font *ttf*))
          (font (pdf:get-font (pdf::font-name fm)))
          (width (* size chars-per-line))
@@ -69,7 +74,7 @@
         (setf start (skip-discardables items (1+ b)))))))
 
 (defun run-ja-pdf (&key (size 21/2) (chars-per-line 24))
-  (let* ((codes (read-codes (merge-pathnames "demo/sample-ja.txt" *base*)))
+  (let* ((codes (read-codes (rel "demo/sample-ja.txt")))
          (fm (pdf:load-ttf-font *ttf*))
          (font (pdf:get-font (pdf::font-name fm)))
          (width (* size chars-per-line))
@@ -106,7 +111,7 @@
                 (1- (length lines)) bad (if (zerop bad) " (= 全行ぴったり)" " <== 失敗")))
 
       ;; 目視用のテキスト出力
-      (let ((txt (merge-pathnames "demo/out-lines.txt" *base*)))
+      (let ((txt (rel "demo/out-lines.txt")))
         (with-open-file (out txt :direction :output :if-exists :supersede
                                  :external-format :utf-8)
           (format out "~a / ~,1fpt / ~d chars per line~%" (pdf::font-name fm)
@@ -132,7 +137,7 @@
             (format t "               ! ~a~%" p))))
 
       ;; PDF 出力
-      (let ((pdf-path (merge-pathnames "demo/ja-typeset.pdf" *base*)))
+      (let ((pdf-path (rel "demo/ja-typeset.pdf")))
         (pdf:with-document ()
           (pdf:with-page ()
             (draw-measure-rules lines size :x 60 :y 760 :width width)

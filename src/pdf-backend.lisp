@@ -51,6 +51,30 @@
                  (pdf:draw-text (cdr g))
                  (setf last-x (car g)))))))
 
+;;; --- フォントのサブセット化を cl-pdf に差し込む ---
+
+(defun gids-for-codes (fm codes)
+  "使用したコードポイントから、cl-pdf の c2g を引いてグリフ番号を集める。"
+  (let ((c2g (pdf::c2g fm))
+        (gids '()))
+    (map nil (lambda (code)
+               (when (<= 0 code #xfffe)
+                 (let ((gid (+ (ash (char-code (aref c2g (* 2 code))) 8)
+                               (char-code (aref c2g (1+ (* 2 code)))))))
+                   (when (plusp gid) (pushnew gid gids)))))
+         codes)
+    gids))
+
+(defun install-subset (fm path codes)
+  "FM の埋め込みデータを、CODES に必要なぶんだけのサブセットに差し替える。
+   ★cl-pdf には一切手を入れない。binary-data と length1 を置き換えるだけ。
+     グリフ番号を保存しているので CIDToGIDMap も /W もそのまま使える。"
+  (let* ((before (pdf::length1 fm))
+         (subset (subset-ttf path (gids-for-codes fm codes))))
+    (setf (pdf::binary-data fm) subset
+          (pdf::length1 fm) (length subset))
+    (values (length subset) before)))
+
 (defun draw-measure-rules (lines size &key (x 60) (y 760) (width 0)
                                            (line-pitch (* size 17/10)))
   "版面の左右端に細い罫線を引く。行末が揃っているかの目視確認用。"

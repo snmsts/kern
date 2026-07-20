@@ -311,28 +311,5 @@
                     :non-empty non-empty :wanted (length wanted-gids)
                     :problems (nreverse problems))))))
 
-;;; ---------------------------------------------------------------------------
-;;; cl-pdf への差し込み
-;;; ---------------------------------------------------------------------------
-
-(defun gids-for-codes (fm codes)
-  "使用したコードポイントから、cl-pdf の c2g を引いてグリフ番号を集める。"
-  (let ((c2g (pdf::c2g fm))
-        (gids '()))
-    (map nil (lambda (code)
-               (when (<= 0 code #xfffe)
-                 (let ((gid (+ (ash (char-code (aref c2g (* 2 code))) 8)
-                               (char-code (aref c2g (1+ (* 2 code)))))))
-                   (when (plusp gid) (pushnew gid gids)))))
-         codes)
-    gids))
-
-(defun install-subset (fm path codes)
-  "FM の埋め込みデータを、CODES に必要なぶんだけのサブセットに差し替える。
-   ★cl-pdf には一切手を入れない。binary-data と length1 を置き換えるだけ。
-     グリフ番号を保存しているので CIDToGIDMap も /W もそのまま使える。"
-  (let* ((before (pdf::length1 fm))
-         (subset (subset-ttf path (gids-for-codes fm codes))))
-    (setf (pdf::binary-data fm) subset
-          (pdf::length1 fm) (length subset))
-    (values (length subset) before)))
+;;; cl-pdf への差し込み (GIDS-FOR-CODES / INSTALL-SUBSET) は
+;;; pdf-backend.lisp にある。このファイルは PDF を知らない。

@@ -54,16 +54,16 @@
             do (cond
                  ((forced-break-p v i)
                   (push (list :position i
-                              :ratio (line-ratio v start i width)
+                              :ratio (greedy-line-ratio v start i width)
                               :line (incf line))
                         result)
                   (setf i n))
                  ((legal-breakpoint-p v i)
-                  (if (<= (line-natural v start i) width)
+                  (if (<= (greedy-line-natural v start i) width)
                       (progn (setf last-legal i) (incf i))   ; まだ入る。覚えておく
                       (let ((b (or last-legal i)))           ; 溢れた。直近の点まで巻き戻す
                         (push (list :position b
-                                    :ratio (line-ratio v start b width)
+                                    :ratio (greedy-line-ratio v start b width)
                                     :line (incf line))
                               result)
                         (setf start (skip-discardables v (1+ b))
@@ -72,10 +72,10 @@
                  (t (incf i)))))
     (nreverse result)))
 
-(defun line-natural (v from to)
+(defun greedy-line-natural (v from to)
   (loop for i from from below to sum (advance (aref v i))))
 
-(defun line-ratio (v from to width)
+(defun greedy-line-ratio (v from to width)
   (let ((natural 0) (st 0) (sh 0) (inf 0))
     (loop for i from from below to
           for item = (aref v i)

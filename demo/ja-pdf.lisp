@@ -41,14 +41,14 @@
 (defun glyphs-only (line)
   (apply #'concatenate 'string (mapcar #'cdr (line-glyphs line))))
 
-(defun check-lines (lines)
+(defun check-lines (lines &optional (rs (default-ruleset)))
   "禁則が守られたか数える。"
   (let ((head 0) (tail 0))
     (dolist (l lines)
       (let ((s (glyphs-only l)))
         (when (plusp (length s))
-          (when (member (char-code (char s 0)) *kinsoku-head*) (incf head))
-          (when (member (char-code (char s (1- (length s)))) *kinsoku-tail*) (incf tail)))))
+          (when (gethash (char-code (char s 0)) (rs-line-start-forbidden rs)) (incf head))
+          (when (gethash (char-code (char s (1- (length s)))) (rs-line-end-forbidden rs)) (incf tail)))))
     (values head tail)))
 
 (defun diagnose (&key (size 21/2) (chars-per-line 24))

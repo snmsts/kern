@@ -258,10 +258,10 @@
             (let ((from (parse-integer args :end comma :junk-allowed t))
                   (to (parse-integer args :start (1+ comma) :junk-allowed t)))
               (when (and from to (gethash from classes) (gethash to classes))
-                (copy-jfm-class from to classes))))
+                (copy-class-glue from to classes))))
           (setf pos close))))))
 
-(defun copy-jfm-class (from to classes)
+(defun copy-class-glue (from to classes)
   (let ((fc (gethash from classes))
         (tc (gethash to classes)))
     ;; from の glue 行を to に複製
@@ -287,3 +287,89 @@
                      (setf (gethash c table) num)))))
              classes)
     table))
+
+;;; ---------------------------------------------------------------------------
+;;; ruleset -- 表を束ねて、問い合わせを平坦な参照にする
+;;; ---------------------------------------------------------------------------
+;;; ★合成は構築時に済ませ、内側のループ (1文字ごと) は配列/ハッシュ一発にする。
+;;;   問い合わせ時にチェーンを辿る設計にしない。
+
+(defstruct (ruleset (:conc-name rs-))
+  (classes (make-hash-table))     ; クラス番号 → jfm-class
+  (char->class (make-hash-table)) ; 文字コード → クラス番号
+  (kanjiskip nil)                 ; jfm-glue: 和文字間
+  (xkanjiskip nil)                ; jfm-glue: 和欧間
+  ;; 禁則: 行頭に来てはいけない/行末に来てはいけない文字コードの集合。
+  ;; JFM のクラス対で「切ってはいけない」場所は penalty で表すが、
+  ;; JFM 自体は禁則を直接持たないので、クラスから導く (build-ruleset を参照)。
+  (line-start-forbidden (make-hash-table))
+  (line-end-forbidden (make-hash-table)))
+
+(defun char-class-of (rs code)
+  "文字コードのクラス番号。未登録は 0 (漢字等)。"
+  (gethash code (rs-char->class rs) 0))
+
+(defun class-glue (rs class-a class-b)
+  "クラス A の後、クラス B の前に入る jfm-glue。無ければ NIL。"
+  (let ((ca (gethash class-a (rs-classes rs))))
+    (when ca (gethash class-b (jc-glue ca)))))
+
+;;; JLReq の行頭禁則・行末禁則に相当する文字クラス。
+;;; jfm-jlreq.lua はクラスは持つが禁則自体は持たない (禁則は pTeX 側のマクロ)。
+;;; JLReq 表4/表5 に基づく標準的な割り当てをクラス番号で与える。
+(defparameter *line-start-forbidden-classes*
+  '(2 4 5 6 7 9 10 11)
+  "行頭禁則: 終わり括弧 区切り約物 中点 句点 読点 繰返し 長音 小書き仮名。")
+(defparameter *line-end-forbidden-classes*
+  '(1)
+  "行末禁則: 始め括弧。")
+
+(defun build-ruleset (jfm-path)
+  "jfm-jlreq.lua から ruleset を構築する。"
+  (let* ((classes (parse-jfm jfm-path))
+         (rs (make-ruleset :classes classes
+                           :char->class (build-char->class classes))))
+    ;; kanjiskip / xkanjiskip はトップレベルにあるので別に読む
+    (multiple-value-bind (kanji xkanji) (read-skip-parameters jfm-path)
+      (setf (rs-kanjiskip rs) kanji
+            (rs-xkanjiskip rs) xkanji))
+    ;; 禁則クラスに属する文字を集める
+    (dolist (cls *line-start-forbidden-classes*)
+      (let ((c (gethash cls classes)))
+        (when c (dolist (ch (jc-chars c))
+                  (when (integerp ch)
+                    (setf (gethash ch (rs-line-start-forbidden rs)) t))))))
+    (dolist (cls *line-end-forbidden-classes*)
+      (let ((c (gethash cls classes)))
+        (when c (dolist (ch (jc-chars c))
+                  (when (integerp ch)
+                    (setf (gethash ch (rs-line-end-forbidden rs)) t))))))
+    rs))
+
+(defun read-skip-parameters (path)
+  "kanjiskip = {n,s,h} と xkanjiskip = {n,s,h} を読む。
+   {伸び用priority, 縮み用priority} は別のコメントにあるが、この JFM では
+   xkanjiskip の priority は {1,-3}、kanjiskip は {0,0}。ここでは値だけ拾う。"
+  (let* ((src (with-open-file (in path :external-format :utf-8)
+                (let ((s (make-string (file-length in))))
+                  (subseq s 0 (read-sequence s in)))))
+         (kanji (read-named-triple src "kanjiskip"))
+         (xkanji (read-named-triple src "xkanjiskip")))
+    (values
+     (make-jfm-glue :natural (first kanji) :stretch (second kanji) :shrink (third kanji)
+                    :stretch-priority 0 :shrink-priority 0)
+     (make-jfm-glue :natural (first xkanji) :stretch (second xkanji) :shrink (third xkanji)
+                    :stretch-priority 1 :shrink-priority -3))))
+
+(defun read-named-triple (src name)
+  "`NAME = {a, b, c}` を探して (a b c) を返す。xkanjiskip を先に読まないよう、
+   語境界に注意する。"
+  (let* ((needle (concatenate 'string name " = {"))
+         (p (search needle src)))
+    ;; kanjiskip は xkanjiskip の部分文字列なので、前が英字でない出現を選ぶ
+    (loop while (and p (plusp p) (alpha-char-p (char src (1- p))))
+          do (setf p (search needle src :start2 (1+ p))))
+    (unless p (error "~a が見つからない" name))
+    (let ((r (make-lua-reader :string src :pos (+ p (length name) 3))))
+      (let ((tbl (lr-read-table r)))
+        (lt-pos tbl)))))

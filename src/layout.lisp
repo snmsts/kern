@@ -2,12 +2,8 @@
 ;;;;
 ;;;; ★この層だけが言語を知っている。行分割器とグルー解決器は何も知らない。
 ;;;;
-;;;; ★ここに置いている表は【暫定の手書き】。本物は jfm-jlreq.lua (BSD-2) の
-;;;;   約25クラス × クラス対の glue/kern 行列。差し替える前提で、
-;;;;   同じ形 (クラス → クラス対 → glue) にしてある。
-;;;;   数値は jfm-jlreq.lua に合わせてある:
-;;;;     kanjiskip  = {0,    0.25, 0    }
-;;;;     xkanjiskip = {0.25, 0.25, 0.125}
+;;;; ★文字クラスと空き量は jfm-jlreq.lua (BSD-2) から読んだ ruleset を使う。
+;;;;   手書きの暫定表は撤去した。約25クラス × クラス対の glue 行列がそのまま効く。
 ;;;;
 ;;;; ★この層は cl-pdf を参照しない。フォントには総称関数で問い合わせる。
 
@@ -24,100 +20,86 @@
   (:documentation "ベースラインから上。行送りの算出に使う。"))
 
 ;;; ---------------------------------------------------------------------------
-;;; 文字クラス (暫定)
+;;; 既定の ruleset
 ;;; ---------------------------------------------------------------------------
 
-(defparameter *kinsoku-head*
-  '(#x3002 #x3001 #x300D #x300F #xFF09 #xFF01 #xFF1F #x30FC #x3005
-    #x3041 #x3043 #x3045 #x3047 #x3049 #x3063 #x3083 #x3085 #x3087
-    #x30A1 #x30A3 #x30A5 #x30A7 #x30A9 #x30C3 #x30E3 #x30E5 #x30E7)
-  "行頭禁則。")
+(defparameter *default-jfm*
+  (asdf:system-relative-pathname "typeset" "vendor/jlreq/jfm-jlreq.lua")
+  "既定の JFM。abenori/jlreq (BSD-2)。")
 
-(defparameter *kinsoku-tail*
-  '(#x300C #x300E #xFF08)
-  "行末禁則。")
+(defvar *ruleset* nil "現在の ruleset。default-ruleset が遅延構築する。")
 
-(defun char-class (code)
-  (cond ((member code '(#x3002 #x3001))          :kuten)   ; 句点・読点
-        ((member code '(#x300D #x300F #xFF09))   :close)   ; 閉じ括弧
-        ((member code '(#x300C #x300E #xFF08))   :open)    ; 開き括弧
-        ((= code #x3000)                         :ideographic-space)
-        ((= code #x20)                           :space)
-        ((< code #x2E80)                         :latin)   ; 乱暴だが暫定
-        (t                                       :ideographic)))
+(defun default-ruleset ()
+  (or *ruleset* (setf *ruleset* (build-ruleset *default-jfm*))))
 
-(defun japanese-p (class)
-  (member class '(:kuten :close :open :ideographic :ideographic-space)))
+;;; jfm-jlreq の値は zw (=1em) 単位。SIZE を掛けて実寸にする。
+(defun jfm-glue->glue (jg size &rest initargs)
+  (apply #'make-glue (* size (jg-natural jg))
+         :stretch (* size (jg-stretch jg))
+         :shrink  (* size (jg-shrink jg))
+         :stretch-priority (jg-stretch-priority jg)
+         :shrink-priority  (jg-shrink-priority jg)
+         :ratio (jg-ratio jg)
+         initargs))
 
-;;; 約物は全角の枠に字面が半角ぶん寄り、残りがアキになる。
-;;; そのアキが詰めの原資 (追い込み)。段階は jfm-jlreq の priority に対応させる。
-(defun space-after (class)  (if (member class '(:kuten :close)) 1/2 0))
-(defun space-before (class) (if (eq class :open) 1/2 0))
+(defun latin-class-p (rs class) (declare (ignore rs)) (= class 27))
+(defun ideographic-class-p (class)
+  "JFM のクラスのうち、字間 (kanjiskip) 調整の対象になる和文クラス。
+   jfm-jlreq のコメント: 4,9,10,11,15,16,19(=0) との間は (x)kanjiskip。"
+  (member class '(0 4 9 10 11 15 16)))
 
-(defparameter *kanjiskip*  '(0 1/4 0)     "自然幅・伸び・縮み (em)。")
-(defparameter *xkanjiskip* '(1/4 1/4 1/8) "和欧間。四分アキ。")
-
-(defun gap-between (class-a class-b size)
-  "A と B のあいだに入れる glue を返す。無ければ NIL。
-   ★jfm-jlreq のクラス対表を、クラスが少ない版で真似たもの。"
-  (let ((after (space-after class-a))
-        (before (space-before class-b)))
+(defun inter-glue (rs class-a class-b size)
+  "A と B のあいだに入れる glue。まず JFM のクラス対表を引き、
+   無ければ kanjiskip / xkanjiskip にフォールバックする。"
+  (let ((jg (class-glue rs class-a class-b)))
     (cond
-      ;; 約物のアキ。詰められる。段階を分ける (句点後が先、括弧が後)
-      ((plusp (+ after before))
-       (let ((amount (* size (+ after before))))
-         (make-glue amount :shrink amount
-                           :shrink-priority (if (plusp after) 2 1))))
+      (jg (jfm-glue->glue jg size))
       ;; 和欧間
-      ((or (and (japanese-p class-a) (eq class-b :latin))
-           (and (eq class-a :latin) (japanese-p class-b)))
-       (destructuring-bind (nat str shr) *xkanjiskip*
-         (make-glue (* size nat) :stretch (* size str) :shrink (* size shr)
-                                 :shrink-priority 0 :stretch-priority 0)))
-      ;; 和文字間。自然幅 0、伸びのみ。均等割りの担い手
-      ((and (japanese-p class-a) (japanese-p class-b))
-       (destructuring-bind (nat str shr) *kanjiskip*
-         (make-glue (* size nat) :stretch (* size str) :shrink (* size shr)
-                                 :shrink-priority -1 :stretch-priority 0)))
+      ((or (and (ideographic-class-p class-a) (latin-class-p rs class-b))
+           (and (latin-class-p rs class-a) (ideographic-class-p class-b)))
+       (jfm-glue->glue (rs-xkanjiskip rs) size))
+      ;; 和文字間
+      ((and (ideographic-class-p class-a) (ideographic-class-p class-b))
+       (jfm-glue->glue (rs-kanjiskip rs) size))
       (t nil))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; item 生成
 ;;; ---------------------------------------------------------------------------
 
-(defun text-items (codes font size &key (kinsoku t))
+(defun forbid-break-p (rs a b)
+  "A と B のあいだで切ってはいけないか。
+   行頭禁則 (B を行頭に置かない) と 行末禁則 (A を行末に置かない) を畳む。"
+  (or (gethash b (rs-line-start-forbidden rs))
+      (gethash a (rs-line-end-forbidden rs))))
+
+(defun text-items (codes font size &key (kinsoku t) (ruleset (default-ruleset)))
   "コードポイント列を item 列にする。source-start/end も埋める (逆写像)。
 
-   ★禁則は『この位置で切ってはいけない』という一つの判定に畳める:
-       行頭禁則 (B を行頭に置かない) = A と B のあいだで切らない
-       行末禁則 (A を行末に置かない) = A と B のあいだで切らない
+   ★禁則は『この位置で切ってはいけない』という一つの判定に畳める。
      penalty を glue の【前】に置くと、glue も penalty 自身も分割点でなくなる。"
-  (let ((n (length codes))
+  (let ((rs ruleset)
+        (n (length codes))
         (items '()))
     (dotimes (i n)
       (let* ((c (aref codes i))
-             (class (char-class c)))
-        (if (eq class :space)
+             (class (char-class-of rs c)))
+        (if (= c #x20)
             ;; 欧文の単語間。フォントの空白幅を自然幅にする
             (let ((w (glyph-advance font (code-char c) size)))
               (push (make-glue w :stretch (/ w 2) :shrink (/ w 3)
                                  :source-start i :source-end (1+ i))
                     items))
-            (push (make-glyph-box
-                   ;; 約物は字面ぶんだけ。残りのアキは前後の glue が持つ
-                   (- (glyph-advance font (code-char c) size)
-                      (* size (+ (space-after class) (space-before class))))
-                   (string (code-char c))
-                   :source-start i :source-end (1+ i))
+            (push (make-glyph-box (glyph-advance font (code-char c) size)
+                                  (string (code-char c))
+                                  :source-start i :source-end (1+ i))
                   items))
         (when (< (1+ i) n)
           (let* ((next (aref codes (1+ i)))
-                 (next-class (char-class next))
-                 (forbid (and kinsoku
-                              (or (member next *kinsoku-head*)
-                                  (member c *kinsoku-tail*))))
-                 (glue (unless (or (eq class :space) (eq next-class :space))
-                         (gap-between class next-class size))))
+                 (next-class (char-class-of rs next))
+                 (forbid (and kinsoku (forbid-break-p rs c next)))
+                 (glue (unless (or (= c #x20) (= next #x20))
+                         (inter-glue rs class next-class size))))
             (when (and forbid glue)
               (push (make-penalty +inf-penalty+) items))
             (when glue (push glue items))))))

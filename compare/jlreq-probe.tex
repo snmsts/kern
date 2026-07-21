@@ -1,34 +1,36 @@
-% jlreq-probe.tex -- LuaLaTeX + jlreq の toolchain 検証 & ground-truth 抽出の土台
+% jlreq-probe.tex -- LuaLaTeX + jlreq の ground-truth 抽出
 %
-% ねらい: jlreq クラスは LuaTeX モードで jfm-jlreq.lua を使う = kern が読むのと同じ
-%   JFM データ。だから食い違えばエンジン論理 (kern の set-glue vs luatexja) に局在する。
+% jlreq クラスは LuaTeX モードで jfm-jlreq.lua を使う = kern が読むのと同じ JFM データ。
+% 食い違えばエンジン論理 (kern set-glue vs luatexja) に局在する。
 %
-% コンパイル (Docker):
-%   docker run --rm -v "$PWD":/work -w /work texlive/texlive \
+% コンパイル (Docker, arm64 native):
+%   docker run --rm -v "$(pwd -W):/work" -w /work/compare texlive/texlive \
 %     lualatex -interaction=nonstopmode jlreq-probe.tex
 %
-% 見るもの:
-%   - jlreq-probe.pdf  : 目視
-%   - jlreq-probe.log  : \showbox が吐く hbox の glue/kern ノード (§4.19 の分配)
+% 見るもの: jlreq-probe.log の \showbox 出力。
+%   fontsize=10pt なので zw=10pt。glue の 2.5=四分(1/4zw), 5.0=二分(1/2zw)。
 
 \documentclass[paper=a5,fontsize=10pt]{jlreq}
 \usepackage{luatexja-ruby}
 
-% ボックスの中身をログへ深く吐かせる
 \showboxdepth=10
-\showboxbreadth=100
+\showboxbreadth=1000
 
 \begin{document}
 
-% (1) §4.19 を刺激する行: 約物 (読点・句点・括弧) と和欧混植
-日本語の組版、これは「テスト」です。ABC も混植する。
-
-% (2) ルビ: モノルビ (| で区切ると各親字に対応)
-\ruby{漢字}{かん|じ}にルビを振る。
-
-% (3) 指定幅の hbox をダンプ = 行長調整の glue 決定を数値で取り出す
-%     10 zw に「日本語、テスト。」を詰め込む → 詰め処理が走る
-\setbox0=\hbox to 10\zw{日本語、「テスト」。ABC。}
+% (A) §4.19 priority: 段落モードで組むと luatexja の行調整 (priority) が効く。
+%     \vbox に \hsize=10zw で流し込み、各行の hbox とその glue set を見る。
+%     詰めが要る行 (約物・和欧混植を含む) を意図的に作る。
+\setbox0=\vbox{\hsize=10\zw \parindent=0pt
+  日本語の組版、これは「テスト」です。ABCも混植する長めの段落。}
 \showbox0
+
+% (B) ルビ: モノルビ。親とルビの群数を | で一致させる (漢|字 / かん|じ)。
+%     \showbox でルビ付き親の box 構造 (親字幅・ルビの位置) を見る。
+\setbox1=\hbox{\ruby{漢|字}{かん|じ}}
+\showbox1
+
+% 目視用に本文にも出す
+\ruby{漢|字}{かん|じ}にルビを振る。日本語の組版、これは「テスト」です。
 
 \end{document}

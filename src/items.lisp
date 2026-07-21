@@ -12,6 +12,7 @@
            #:item #:source-start #:source-end #:advance #:discardable-p
            #:box #:ascent #:descent #:protrusion
            #:glyph-box #:box-font #:box-glyphs #:glyph-offset
+           #:ruby-box #:ruby-placements #:ruby-mono
            #:glue #:stretch #:shrink #:stretch-order #:shrink-order
            #:stretch-priority #:shrink-priority #:glue-ratio
            #:penalty #:penalty-value #:flagged-p
@@ -78,6 +79,35 @@
    ;;   例: 句点 (align=left) は字面が枠の左寄り = オフセット 0。
    ;;       始め括弧 (align=right) は字面が右寄り = 実グリフを左へ引く負のオフセット。
    (glyph-offset :initarg :glyph-offset :initform 0 :accessor glyph-offset :type len)))
+
+;;; ---------------------------------------------------------------------------
+;;; ruby-box -- 親文字の上にルビが乗った単位。ストリーム内では atomic な box。
+;;; ---------------------------------------------------------------------------
+;;; ★単一ベースラインの前提を破る唯一の箱。親グリフ (通常サイズ) と
+;;;   ルビグリフ (半分サイズ) を別々の y に置く。行分割器は advance しか見ないので
+;;;   これも普通の不可分 box として扱える。上への張り出しは ascent に出す。
+;;; ★placements = ((x y size . 文字列) ...)。box 左端・親ベースライン基準。
+;;;   y は上が正 (親グリフ y=0、ルビは rise ぶん上)。size はそのグリフの実サイズ。
+;;;   描画バックエンドはこの並びを歩いて、各 x に size で文字列を置くだけ。
+
+(defclass ruby-box (box)
+  ((placements :initarg :placements :initform nil :accessor ruby-placements)))
+
+(defun ruby-mono (base-advance base-ascent base-descent base-string base-size
+                  ruby-advance ruby-string ruby-size &key (gap 0))
+  "モノルビ (親1字 + ルビ1組) の ruby-box。オーバーハング無し。
+   ルビ>親なら箱を max(親,ルビ) 幅へ広げ、親・ルビとも中央に置く (JLReq: モノは中央揃え)。
+   ascent = 親 ascent + 空き + ルビ高 で、ルビ字面の上端まで箱が伸びる。"
+  (let* ((adv    (max base-advance ruby-advance))
+         (rise   (+ base-ascent gap))          ; ルビのベースライン上げ量
+         (base-x (/ (- adv base-advance) 2))
+         (ruby-x (/ (- adv ruby-advance) 2)))
+    (make-instance 'ruby-box
+                   :advance adv
+                   :ascent  (+ rise ruby-size) ; ルビ字面の上端
+                   :descent base-descent
+                   :placements (list (list base-x 0    base-size base-string)
+                                     (list ruby-x rise ruby-size ruby-string)))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; glue -- 伸縮する空き。均等割りの担い手。

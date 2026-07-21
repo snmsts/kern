@@ -64,7 +64,10 @@
   :depends-on ("kern")
   :serial t
   :components ((:module "test"
-                :components ((:file "line-adjustment"))))
+                :components ((:file "line-adjustment")
+                             (:file "ruby"))))
   :perform (test-op (o c)
-             (unless (uiop:symbol-call '#:kern '#:run-line-adjustment-tests)
-               (error "kern regression tests failed"))))
+             (let ((ok1 (uiop:symbol-call '#:kern '#:run-line-adjustment-tests))
+                   (ok2 (uiop:symbol-call '#:kern '#:run-ruby-tests)))
+               (unless (and ok1 ok2)
+                 (error "kern regression tests failed")))))

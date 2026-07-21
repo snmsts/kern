@@ -1,0 +1,34 @@
+% jlreq-probe.tex -- LuaLaTeX + jlreq の toolchain 検証 & ground-truth 抽出の土台
+%
+% ねらい: jlreq クラスは LuaTeX モードで jfm-jlreq.lua を使う = kern が読むのと同じ
+%   JFM データ。だから食い違えばエンジン論理 (kern の set-glue vs luatexja) に局在する。
+%
+% コンパイル (Docker):
+%   docker run --rm -v "$PWD":/work -w /work texlive/texlive \
+%     lualatex -interaction=nonstopmode jlreq-probe.tex
+%
+% 見るもの:
+%   - jlreq-probe.pdf  : 目視
+%   - jlreq-probe.log  : \showbox が吐く hbox の glue/kern ノード (§4.19 の分配)
+
+\documentclass[paper=a5,fontsize=10pt]{jlreq}
+\usepackage{luatexja-ruby}
+
+% ボックスの中身をログへ深く吐かせる
+\showboxdepth=10
+\showboxbreadth=100
+
+\begin{document}
+
+% (1) §4.19 を刺激する行: 約物 (読点・句点・括弧) と和欧混植
+日本語の組版、これは「テスト」です。ABC も混植する。
+
+% (2) ルビ: モノルビ (| で区切ると各親字に対応)
+\ruby{漢字}{かん|じ}にルビを振る。
+
+% (3) 指定幅の hbox をダンプ = 行長調整の glue 決定を数値で取り出す
+%     10 zw に「日本語、テスト。」を詰め込む → 詰め処理が走る
+\setbox0=\hbox to 10\zw{日本語、「テスト」。ABC。}
+\showbox0
+
+\end{document}

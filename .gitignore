@@ -9,3 +9,10 @@ vendor/
 *.dx64fsl
 demo/extracted.txt
 demo/out-lines.txt
+
+# TeX の生成物 (compare/ の ground-truth 比較)
+*.aux
+*.log
+*.dvi
+*.out
+*.synctex.gz

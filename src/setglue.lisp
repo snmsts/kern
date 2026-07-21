@@ -43,8 +43,12 @@
    priority の高い段階から順に使い切り、足りなければ次の段階へ。
    同じ段階のなかでは伸縮量に比例して配る。
 
-   OVERUSE-P が真なら、全段階を使い切ってもまだ残る場合に参加者全体へ
+   OVERUSE-P が真なら、全段階を使い切ってもまだ残る場合に【最下位段階だけ】へ
    比例で【超過して】配る (伸ばしすぎ。TeX の r>1 に相当)。
+   全参加者でなく最下位段階に限るのは JIS X 4051 §4.19 空け段4 に沿うため:
+   上位段階 (欧文間=二分, 和欧間=二分) はそれぞれの上限で止め、余りは最下位段階
+   (=分割可能文字間の kanjiskip 字間) だけを無限に空ける。純欧文行では欧文間が
+   唯一の段=最下位なので、従来どおり欧文間が上限を越えて伸びる (欧文の均等割り)。
    偽なら残りをそのまま返す。縮みは自然幅 - 縮み量を下回れないのでこちら。
 
    返り値: 配りきれずに残った量。"
@@ -68,10 +72,14 @@
                ;; 段階を使い切って次へ
                (dolist (p group) (give p (amount p)))
                (decf remaining avail))))))
-      (when (and (plusp remaining) overuse-p)
-        (let ((total (reduce #'+ participants :key #'amount :initial-value 0)))
+      (when (and (plusp remaining) overuse-p stages)
+        ;; §4.19 空け段4: 最下位段階 (分割可能文字間) だけを無限に空ける。
+        ;; 上位段階は自身の上限で止まったまま = 欧文間/和欧間は二分を越えない。
+        (let* ((lowest (car (last stages)))
+               (group (remove-if-not (lambda (p) (= (priority p) lowest)) participants))
+               (total (reduce #'+ group :key #'amount :initial-value 0)))
           (when (plusp total)
-            (dolist (p participants)
+            (dolist (p group)
               (give p (* remaining (/ (amount p) total))))
             (setf remaining 0))))
       remaining)))

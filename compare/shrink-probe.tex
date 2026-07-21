@@ -1,0 +1,24 @@
+% shrink-probe.tex -- 追い込み (詰め) で luatexja がグルーをどう分配するか実測
+%
+% 判別: §4.19 priority なら「欧文間→約物→和欧間」の段階順で、狭い時は欧文間が先に潰れる。
+%       単一比例 (TeX glue_set) なら全部が同じ比で縮む。
+% 内容 "AA BB「あ」DD" に 欧文間(空白2つ) と 約物(括弧) と 和欧間(あ/D) を混ぜる。
+%
+%   docker run --rm -v "$(pwd -W):/work" -w /work/compare texlive/texlive \
+%     lualatex -interaction=nonstopmode shrink-probe.tex
+
+\documentclass[fontsize=10pt]{jlreq}
+\showboxdepth=10
+\showboxbreadth=1000
+
+\begin{document}
+
+% (A) 手動 hbox を自然幅より狭く。glue set 比と各グルーの縮みを見る。
+\setbox0=\hbox to 7\zw{AA BB「あ」DD}
+\showbox0
+
+% (B) 同じ内容を段落モードで同じ幅に押し込む (luatexja の priority 調整が効く経路)。
+\setbox1=\vbox{\hsize=7\zw \parindent=0pt \noindent AA BB「あ」DD\par}
+\showbox1
+
+\end{document}

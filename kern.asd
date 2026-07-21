@@ -25,6 +25,8 @@
   :license "MIT"
   :depends-on ()
   :serial t
+  ;; (asdf:test-system "kern") → kern/test の test-op へ委譲する。
+  :in-order-to ((test-op (test-op "kern/test")))
   :components ((:module "src"
                 :components ((:file "items")
                              (:file "linebreak")
@@ -53,3 +55,16 @@
                              (:file "glue")
                              (:file "japanese-stress")
                              (:file "ja-pdf")))))
+
+;;; テストは芯 (kern) だけに依存する。cl-pdf も vendor も要らないので
+;;; DLL/フォントを用意せず素の SBCL で回帰確認できる。
+(defsystem "kern/test"
+  :description "Regression tests (JIS X 4051 §4.19 line adjustment). Font-free."
+  :license "MIT"
+  :depends-on ("kern")
+  :serial t
+  :components ((:module "test"
+                :components ((:file "line-adjustment"))))
+  :perform (test-op (o c)
+             (unless (uiop:symbol-call '#:kern '#:run-line-adjustment-tests)
+               (error "kern regression tests failed"))))

@@ -54,7 +54,8 @@
                 :components ((:file "compare")
                              (:file "glue")
                              (:file "japanese-stress")
-                             (:file "ja-pdf")))))
+                             (:file "ja-pdf")
+                             (:file "ruby")))))
 
 ;;; テストは芯 (kern) だけに依存する。cl-pdf も vendor も要らないので
 ;;; DLL/フォントを用意せず素の SBCL で回帰確認できる。

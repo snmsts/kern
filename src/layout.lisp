@@ -131,6 +131,19 @@
                           :glyph-offset offset
                           :source-start start :source-end end)))))
 
+(defun mono-ruby-box (font size base-code ruby-string &key (gap 0))
+  "親1字 (BASE-CODE) にルビ文字列 (RUBY-STRING) を振ったモノルビ ruby-box。
+   フォント計測を引き受ける実 API。ルビは半分サイズ、オーバーハング無し。
+   親は full-width 前提。descent は em 枠から ascent を引いた近似。"
+  (let* ((base-ch  (code-char base-code))
+         (base-adv (glyph-advance font base-ch size))
+         (asc      (font-ascent* font size))
+         (rsize    (/ size 2))
+         (ruby-adv (loop for ch across ruby-string
+                         sum (glyph-advance font ch rsize))))
+    (ruby-mono base-adv asc (- size asc) (string base-ch) size
+               ruby-adv ruby-string rsize :gap gap)))
+
 (defun text-items (codes font size &key (kinsoku t) (ruleset (default-ruleset)))
   "コードポイント列を item 列にする。source-start/end も埋める (逆写像)。
 

@@ -12,7 +12,8 @@
            #:item #:source-start #:source-end #:advance #:discardable-p
            #:box #:ascent #:descent #:protrusion
            #:glyph-box #:box-font #:box-glyphs #:glyph-offset
-           #:ruby-box #:ruby-placements #:ruby-mono
+           #:ruby-box #:ruby-placements #:ruby-mono #:mono-ruby-box
+           #:make-placed #:placed-x #:placed-y #:placed-size #:placed-string
            #:glue #:stretch #:shrink #:stretch-order #:shrink-order
            #:stretch-priority #:shrink-priority #:glue-ratio
            #:penalty #:penalty-value #:flagged-p

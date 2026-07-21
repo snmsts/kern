@@ -16,3 +16,7 @@ demo/out-lines.txt
 *.dvi
 *.out
 *.synctex.gz
+*.ltjruby
+
+# レンダリング成果物 (gs で PDF→PNG した目視確認用)
+*.png

@@ -71,3 +71,21 @@ kern は JIS X 4051 の字面に忠実。luatexja default は比例(簡潔・広
 
 **未了**: 詰めシナリオの位置比較を「同一フォント」でやれば絶対位置でも突き合わせられる
 (kern=yumin, jlreq 側も yumin 指定)。今回は zw 単位のグルー分配で差を確定させた。
+
+## Findings (2026-07-22, 視覚比較)
+
+コンテナの `gs` で PDF→PNG (300dpi) して初めて出力を目視した。
+
+- `docker run --rm -v "$(pwd -W):/work" -w /work texlive/texlive
+   gs -dNOPAUSE -dBATCH -sDEVICE=png16m -r300 -dFirstPage=1 -dLastPage=1
+   -sOutputFile=OUT.png IN.pdf`
+
+**kern のモノルビ (demo/ruby.pdf) は jlreq と視覚的に一致**。半分サイズ・親の直上・中央。
+数値 (ascent 13.8) に続き絵でも参照実装と同じ。差らしい差なし。
+
+polish/未了として観測:
+- kern は `ruby-mono` の `gap=0` でルビが親の直上ぴったり。jlreq はごく僅かな空きあり。
+  → `gap` を小さく足すと参照に近づく (polish)。
+- kern はルビ文字列を1つの連続文字列として中央描画。「かん=漢幅」の even ケースは正しく
+  見えるが、ルビが親より狭い多字ルビの**均等配置は未実装 (phase 2 グループルビ)**。
+- テスト行が緩い (STRETCHED) のは test 幅 (9字を12zw) 由来でルビ/組版のバグではない。

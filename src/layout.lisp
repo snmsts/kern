@@ -42,6 +42,26 @@
          :ratio (jg-ratio jg)
          initargs))
 
+;;; §4.19 行長調整で欧文間隔は詰め・空けとも段1 (最優先)。
+;;; 約物 (JFM 由来) は shrink-priority 0..-2 / stretch-priority 0..-1、
+;;; 和欧間 (xkanjiskip) は stretch-priority 1 / shrink-priority -3。
+;;; 欧文間はその全部の上に立たねばならない。約物・和欧間は abenori が
+;;; JLReq→JIS を数値化した値なのでそのまま信頼し、欠けている欧文間だけ与える。
+(defconstant +latin-space-stretch-priority+ 2
+  "§4.19 空け段1。和欧間の stretch-priority(1) より上。")
+(defconstant +latin-space-shrink-priority+ 1
+  "§4.19 詰め段1。約物の shrink-priority 最大(0) より上。")
+
+(defun latin-space-glue (w size i)
+  "欧文間隔 (U+0020) の glue。§4.19: 詰めは四分まで・空けは二分まで、
+   両方向で段1。W はフォントが返す空白の実送り幅。"
+  (make-glue w
+             :stretch (max 0 (- (/ size 2) w))   ; 空け上限 = 二分
+             :shrink  (max 0 (- w (/ size 4)))   ; 詰め下限 = 四分
+             :stretch-priority +latin-space-stretch-priority+
+             :shrink-priority  +latin-space-shrink-priority+
+             :source-start i :source-end (1+ i)))
+
 (defun latin-class-p (rs class) (declare (ignore rs)) (= class 27))
 (defun ideographic-class-p (class)
   "JFM のクラスのうち、字間 (kanjiskip) 調整の対象になる和文クラス。
@@ -128,10 +148,8 @@
       (let ((c (aref codes i)))
         ;; その位置の item (空白は glue、他は box)
         (if (= c #x20)
-            (let ((w (glyph-advance font (code-char c) size)))
-              (push (make-glue w :stretch (/ w 2) :shrink (/ w 3)
-                                 :source-start i :source-end (1+ i))
-                    items))
+            (push (latin-space-glue (glyph-advance font (code-char c) size) size i)
+                  items)
             (push (emit-char-box rs font size c i (1+ i)) items))
         ;; 直後の文字との境界。両側とも非空白のときだけ。
         (when (and (< (1+ i) n)

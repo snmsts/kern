@@ -20,7 +20,7 @@
 ;;;;   IN 不可分  SY スラッシュ  PO 後置  PR 前置  GL 不可分空白  WJ 語結合
 ;;;;   ZW ゼロ幅空白  SP 空白 (境界では扱わない)
 
-(in-package #:typeset)
+(in-package #:quad)
 
 (defun break-class (code)
   "コードポイントの UAX #14 行分割クラス (サブセット)。

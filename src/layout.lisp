@@ -7,7 +7,7 @@
 ;;;;
 ;;;; ★この層は cl-pdf を参照しない。フォントには総称関数で問い合わせる。
 
-(in-package #:typeset)
+(in-package #:quad)
 
 ;;; ---------------------------------------------------------------------------
 ;;; メトリクス協定 -- バックエンドが実装する
@@ -24,7 +24,7 @@
 ;;; ---------------------------------------------------------------------------
 
 (defparameter *default-jfm*
-  (asdf:system-relative-pathname "typeset" "vendor/jlreq/jfm-jlreq.lua")
+  (asdf:system-relative-pathname "quad" "vendor/jlreq/jfm-jlreq.lua")
   "既定の JFM。abenori/jlreq (BSD-2)。")
 
 (defvar *ruleset* nil "現在の ruleset。default-ruleset が遅延構築する。")

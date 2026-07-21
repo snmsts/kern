@@ -3,7 +3,7 @@
 ;;;; 1文字 = 1単位として ASCII で組み、空きを実際に伸縮させて描く。
 ;;;; 行末が揃うのは両方同じ。違いは【空きの散らばり方】に出る。
 
-(in-package #:typeset)
+(in-package #:quad)
 
 (defparameter *space-natural* 1)
 (defparameter *space-stretch* 1/2)

@@ -8,7 +8,7 @@
 ;;;;   未パッチだと (a) write-document が undefined function で落ち、
 ;;;;   (b) 康熙部首と衝突する漢字が豆腐になり幅 0 になる。
 
-(in-package #:typeset)
+(in-package #:quad)
 
 ;;; --- メトリクス協定の実装 ---
 

@@ -20,7 +20,7 @@
 ;;;;   ヒンティングを残すなら cvt / fpgm / prep だけ。
 ;;;;   cmap は CIDToGIDMap があるので要らない。GSUB / GPOS / name / post も不要。
 
-(in-package #:typeset)
+(in-package #:quad)
 
 ;;; ---------------------------------------------------------------------------
 ;;; ビッグエンディアンの読み書き

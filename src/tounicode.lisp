@@ -10,7 +10,7 @@
 ;;;; ★この関数は PDF ライブラリを知らない。CMap の本文 (文字列) を返すだけ。
 ;;;;   cl-pdf への注入は pdf-backend.lisp が行う。
 
-(in-package #:typeset)
+(in-package #:quad)
 
 (defun utf16be-hex (code)
   "コードポイントを UTF-16BE の16進文字列にする。/ToUnicode の dst は UTF-16BE。

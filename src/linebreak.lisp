@@ -11,7 +11,7 @@
 ;;;;   行分割の判断は伸縮の【総量】から出るので、配分の【順序】には影響されない。
 ;;;;   priority を見るのはグルー解決器 (set-glue、未実装)。
 
-(in-package #:typeset)
+(in-package #:quad)
 
 (defstruct (break-params (:conc-name param-))
   ;; badness がこれを超える分割候補は捨てる。TeX の \tolerance。

@@ -5,10 +5,8 @@
 ;;;;
 ;;;; discretionary (分割すると中身が変わる箇所 = 欧文のハイフン挿入) は未実装。
 ;;;; 日本語 v1 には要らない。禁則は全て penalty で表現できる。欧文対応時に足す。
-;;;;
-;;;; パッケージ名は暫定。プロジェクト名が決まったら変える。
 
-(defpackage #:typeset
+(defpackage #:quad
   (:use #:cl)
   (:export #:len
            #:item #:source-start #:source-end #:advance #:discardable-p
@@ -20,7 +18,7 @@
            #:+inf-penalty+ #:+forced-break+
            #:make-box #:make-glue #:make-penalty #:make-glyph-box))
 
-(in-package #:typeset)
+(in-package #:quad)
 
 ;;; 内部は抽象単位。バックエンドが DPI 換算する。
 ;;; 有理数にするのは丸め誤差の累積を避けるため。均等割りは除算を大量にやるので、

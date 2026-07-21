@@ -39,12 +39,34 @@
     (la-check= (second (second (ruby-placements rb))) 49/5
                "gap=1: ルビ rise=親ascent+gap")))
 
+(defun test-ruby-emission-in-line ()
+  ;; ルビ箱が実 layout パス (break→set-glue→layout-items) で、box の絶対 x ぶん
+  ;; ずれた配置済みグリフとして行に出るか。フォント不要 (box に幅を直接持たせる)。
+  ;; 本(20) 漢[かん](箱20) 文(20) を幅60=自然幅で組む。
+  (let* ((sz 20)
+         (rb (ruby-mono 20 (* sz 88/100) (* sz 12/100) "漢" 20 20 "かん" 10))
+         (items (coerce (finish-paragraph
+                         (list (make-glyph-box 20 "本") rb (make-glyph-box 20 "文")))
+                        'vector))
+         (lines (layout-items items 60 sz))
+         (gs (and lines (line-glyphs (first lines)))))
+    (la-check= (length lines) 1 "1行")
+    (la-check= (line-status (first lines)) :exact "幅60=自然幅でぴったり")
+    (la-check= (length gs) 4 "グリフ4つ (本 漢 かん 文)")
+    (when (= (length gs) 4)
+      (destructuring-bind (g1 g2 g3 g4) gs
+        (la-check (equal g1 (list 0    0    20 "本"))   "本 (0,0,20)")
+        (la-check (equal g2 (list 20   0    20 "漢"))   "ルビ親 漢 (箱x20+中央0)")
+        (la-check (equal g3 (list 20   88/5 10 "かん")) "ルビ かん (箱x20, rise17.6, 半分10)")
+        (la-check (equal g4 (list 40   0    20 "文"))   "文 (40,0,20)")))))
+
 (defun run-ruby-tests ()
   "ルビ段1 (モノ・オーバーハング無し) の回帰テスト。全通過なら T。"
   (setf *la-checks* 0 *la-fails* 0)
   (test-ruby-mono-shorter)
   (test-ruby-mono-longer)
   (test-ruby-gap)
+  (test-ruby-emission-in-line)
   (format t "~&ruby (mono, no-overhang): ~a/~a checks passed~a~%"
           (- *la-checks* *la-fails*) *la-checks*
           (if (zerop *la-fails*) "  OK" "  *** FAIL ***"))

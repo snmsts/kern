@@ -81,6 +81,21 @@
    (glyph-offset :initarg :glyph-offset :initform 0 :accessor glyph-offset :type len)))
 
 ;;; ---------------------------------------------------------------------------
+;;; 配置済みグリフ -- (x y size . 文字列)
+;;; ---------------------------------------------------------------------------
+;;; laid-line の glyph 列と ruby-box の placements が共有する形。
+;;;   x    : 行頭 (または box 左端) からの相対位置
+;;;   y    : 親ベースラインから上が正 (通常グリフは 0、ルビは rise ぶん上)
+;;;   size : そのグリフの実サイズ (通常は行のサイズ、ルビは半分)
+;;; バックエンドはこの並びを歩き、各 x に size で文字列を置くだけでよい。
+
+(defun make-placed (x y size string) (list x y size string))
+(defun placed-x (g) (first g))
+(defun placed-y (g) (second g))
+(defun placed-size (g) (third g))
+(defun placed-string (g) (fourth g))
+
+;;; ---------------------------------------------------------------------------
 ;;; ruby-box -- 親文字の上にルビが乗った単位。ストリーム内では atomic な box。
 ;;; ---------------------------------------------------------------------------
 ;;; ★単一ベースラインの前提を破る唯一の箱。親グリフ (通常サイズ) と
@@ -106,8 +121,8 @@
                    :advance adv
                    :ascent  (+ rise ruby-size) ; ルビ字面の上端
                    :descent base-descent
-                   :placements (list (list base-x 0    base-size base-string)
-                                     (list ruby-x rise ruby-size ruby-string)))))
+                   :placements (list (make-placed base-x 0    base-size base-string)
+                                     (make-placed ruby-x rise ruby-size ruby-string)))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; glue -- 伸縮する空き。均等割りの担い手。

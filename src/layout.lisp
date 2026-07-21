@@ -173,7 +173,7 @@
 ;;; ---------------------------------------------------------------------------
 
 (defstruct (laid-line (:conc-name line-))
-  (glyphs '())     ; ((x . 文字列) ...) x は行頭からの相対位置
+  (glyphs '())     ; 配置済みグリフ (x y size . 文字列) の並び。x は行頭からの相対位置
   ;; 実寸が正になった glue。((x . 幅) ...)
   ;; 描画には要らない (グリフの x に織り込み済み) が、
   ;; 検証と診断には要る。これが無いと「和欧間のアキが本当に入ったか」を
@@ -183,12 +183,11 @@
   (ratio 0)
   (status :exact))
 
-(defun layout-paragraph (codes font size line-width &key (kinsoku t)
-                                                         (params (make-break-params)))
-  "テキストを行に割り付け、各グリフの位置を確定させる。
-   返り値は LAID-LINE の並び。"
-  (let* ((raw (text-items codes font size :kinsoku kinsoku))
-         (items (coerce (finish-paragraph raw) 'vector))
+(defun layout-items (items line-width size &key (params (make-break-params)))
+  "組み上がった item 列 (ruby-box を含んでよい) を行に割り付ける。
+   SIZE は通常グリフの描画サイズ (ルビは自分の placements にサイズを持つ)。
+   返り値は LAID-LINE の並び。text からの入口は layout-paragraph。"
+  (let* ((items (if (vectorp items) items (coerce items 'vector)))
          (breaks (break-paragraph items line-width :params params :finish nil))
          (start 0)
          (lines '()))
@@ -199,11 +198,19 @@
             (loop for i from start below b
                   for k from 0
                   for item = (aref items i)
-                  do (cond ((typep item 'glyph-box)
-                            ;; 描画位置は box 左端 + 字面オフセット
-                            (push (cons (+ x (glyph-offset item)) (box-glyphs item)) glyphs))
-                           ((and (typep item 'glue) (plusp (aref sizes k)))
-                            (push (cons x (aref sizes k)) gaps)))
+                  do (cond
+                       ((typep item 'ruby-box)
+                        ;; ルビ箱: 配置済みグリフ (親+ルビ) を box 左端 x ぶんずらして撒く
+                        (dolist (p (ruby-placements item))
+                          (push (make-placed (+ x (placed-x p)) (placed-y p)
+                                             (placed-size p) (placed-string p))
+                                glyphs)))
+                       ((typep item 'glyph-box)
+                        ;; 通常グリフは y=0・行サイズ。描画位置は box 左端 + 字面オフセット
+                        (push (make-placed (+ x (glyph-offset item)) 0 size (box-glyphs item))
+                              glyphs))
+                       ((and (typep item 'glue) (plusp (aref sizes k)))
+                        (push (cons x (aref sizes k)) gaps)))
                      (incf x (aref sizes k)))
             (push (make-laid-line :glyphs (nreverse glyphs)
                                   :gaps (nreverse gaps)
@@ -213,3 +220,11 @@
                   lines)))
         (setf start (skip-discardables items (1+ b)))))
     (nreverse lines)))
+
+(defun layout-paragraph (codes font size line-width &key (kinsoku t)
+                                                         (params (make-break-params)))
+  "テキストを行に割り付け、各グリフの位置を確定させる。
+   返り値は LAID-LINE の並び。"
+  (let ((items (coerce (finish-paragraph (text-items codes font size :kinsoku kinsoku))
+                       'vector)))
+    (layout-items items line-width size :params params)))

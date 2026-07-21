@@ -43,13 +43,18 @@
   (loop for line in lines
         for i from 0
         do (pdf:in-text-mode
-             (pdf:set-font font size)
              (pdf:move-text x (- y (* i line-pitch)))
-             (let ((last-x 0))
+             ;; グリフごとに (x y size 文字列)。ルビは y>0・小サイズなので、
+             ;; サイズが変わったら set-font し直し、ベースラインを y ぶん上げる。
+             (let ((last-x 0) (last-y 0) (cur-size nil))
                (dolist (g (line-glyphs line))
-                 (pdf:move-text (float (- (car g) last-x)) 0)
-                 (pdf:draw-text (cdr g))
-                 (setf last-x (car g)))))))
+                 (let ((gx (placed-x g)) (gy (placed-y g)) (gsize (placed-size g)))
+                   (unless (eql gsize cur-size)
+                     (pdf:set-font font gsize)
+                     (setf cur-size gsize))
+                   (pdf:move-text (float (- gx last-x)) (float (- gy last-y)))
+                   (pdf:draw-text (placed-string g))
+                   (setf last-x gx last-y gy)))))))
 
 ;;; --- フォントのサブセット化を cl-pdf に差し込む ---
 

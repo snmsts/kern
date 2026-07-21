@@ -23,7 +23,7 @@
 ;;;; ★item は書き換えない。実寸の配列を新しく返す。
 ;;;;   同じ item 列を別の幅で組み直せるようにするため (GUI の再レイアウト)。
 
-(in-package #:quad)
+(in-package #:kern)
 
 (defun %participants (items start end amount-fn order-fn)
   "伸縮に参加する glue を集め、最高位数のものだけに絞って (位置 . item) の並びを返す。"

@@ -13,7 +13,7 @@
 ;;; ★zlib の選択は cl-pdf.asd が読まれる【前】に決まる。
 ;;;   既定は :use-no-zlib で、その場合ストリームもフォントも無圧縮になる。
 ;;;   feature を切り替えた直後は fasl が古いままなので、一度だけ
-;;;   (asdf:load-system "quad/demo" :force t) が要る。
+;;;   (asdf:load-system "kern/demo" :force t) が要る。
 (pushnew :use-salza2-zlib *features*)
 
 (let ((here (make-pathname :name nil :type nil :defaults *load-truename*)))
@@ -22,16 +22,16 @@
   (unless (probe-file (merge-pathnames "vendor/cl-pdf/cl-pdf.asd" here))
     (warn "vendor/cl-pdf が無い。~%  git clone https://github.com/mbattyani/cl-pdf.git vendor/cl-pdf~%  そのうえで DESIGN.md のパッチ2本を当てること。")))
 
-(asdf:load-system "quad/demo")
+(asdf:load-system "kern/demo")
 
 ;;; ストリーム圧縮は既定 nil。*compress-fonts* は既定 t なので、
 ;;; zlib 実装さえ入ればフォントも圧縮される。
 (setf pdf:*compress-streams* t)
 
-(format t "~&~%quad loaded.~%")
-(format t "  (quad::run-ja-pdf)   端から端まで: 和文を組んで PDF を書く~%")
-(format t "  (quad::run)          欧文で貪欲法と Knuth-Plass を比較~%")
-(format t "  (quad::sweep)        行幅を振って両者の差を測る~%")
-(format t "  (quad::run-glue)     段階付きの詰めと比例配分を比較~%")
-(format t "  (quad::stress)       和文の負荷試験 (禁則の検証つき)~%")
-(format t "  (quad::scaling)      文字数に対する計算量~%")
+(format t "~&~%kern loaded.~%")
+(format t "  (kern::run-ja-pdf)   端から端まで: 和文を組んで PDF を書く~%")
+(format t "  (kern::run)          欧文で貪欲法と Knuth-Plass を比較~%")
+(format t "  (kern::sweep)        行幅を振って両者の差を測る~%")
+(format t "  (kern::run-glue)     段階付きの詰めと比例配分を比較~%")
+(format t "  (kern::stress)       和文の負荷試験 (禁則の検証つき)~%")
+(format t "  (kern::scaling)      文字数に対する計算量~%")

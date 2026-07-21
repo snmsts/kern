@@ -4,11 +4,11 @@
 ;;;; 出力の目視用に、組まれた行を UTF-8 のテキストにも書き出す
 ;;;; (Windows のコンソールは和文を化けさせるため)。
 
-(in-package #:quad)
+(in-package #:kern)
 
 (defun rel (path)
   "システムからの相対パス。絶対パスを埋め込まないため。"
-  (asdf:system-relative-pathname "quad" path))
+  (asdf:system-relative-pathname "kern" path))
 
 (defparameter *ttf* #P"C:/Windows/Fonts/yumin.ttf"
   "游明朝。Windows に素の .ttf で入っている数少ない和文フォント
@@ -137,7 +137,7 @@
             (format t "               ! ~a~%" p))))
 
       ;; PDF 出力
-      (let ((pdf-path (rel "demo/ja-quad.pdf")))
+      (let ((pdf-path (rel "demo/ja-kern.pdf")))
         (pdf:with-document ()
           (pdf:with-page ()
             (draw-measure-rules lines size :x 60 :y 760 :width width)

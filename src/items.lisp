@@ -110,17 +110,22 @@
   ((placements :initarg :placements :initform nil :accessor ruby-placements)))
 
 (defun ruby-mono (base-advance base-ascent base-descent base-string base-size
-                  ruby-advance ruby-string ruby-size &key (gap 0))
+                  ruby-advance ruby-string ruby-size ruby-ascent &key (gap 0))
   "モノルビ (親1字 + ルビ1組) の ruby-box。オーバーハング無し。
    ルビ>親なら箱を max(親,ルビ) 幅へ広げ、親・ルビとも中央に置く (JLReq: モノは中央揃え)。
-   ascent = 親 ascent + 空き + ルビ高 で、ルビ字面の上端まで箱が伸びる。"
-  (let* ((adv    (max base-advance ruby-advance))
-         (rise   (+ base-ascent gap))          ; ルビのベースライン上げ量
-         (base-x (/ (- adv base-advance) 2))
-         (ruby-x (/ (- adv ruby-advance) 2)))
+
+   ★ルビの baseline は 親ascent + ルビdescent + gap の高さに置く。ルビ descent 分だけ
+     浮かせるのは、ルビ字面の下端 (baseline−descent) が親 ascent にちょうど接するようにするため。
+     luatexja の ruby もこの位置 (baseline = 親ascent+ルビdescent) にある (compare/ で実測)。
+   ★箱 ascent = rise + ルビascent = 親ascent + ルビsize + gap。gap=0 なら 親ascent+ルビsize。"
+  (let* ((adv          (max base-advance ruby-advance))
+         (ruby-descent (- ruby-size ruby-ascent))
+         (rise         (+ base-ascent ruby-descent gap))
+         (base-x       (/ (- adv base-advance) 2))
+         (ruby-x       (/ (- adv ruby-advance) 2)))
     (make-instance 'ruby-box
                    :advance adv
-                   :ascent  (+ rise ruby-size) ; ルビ字面の上端
+                   :ascent  (+ rise ruby-ascent)
                    :descent base-descent
                    :placements (list (make-placed base-x 0    base-size base-string)
                                      (make-placed ruby-x rise ruby-size ruby-string)))))

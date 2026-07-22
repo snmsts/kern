@@ -139,10 +139,11 @@
          (base-adv (glyph-advance font base-ch size))
          (asc      (font-ascent* font size))
          (rsize    (/ size 2))
+         (rasc     (font-ascent* font rsize))   ; ルビ ascent (baseline 決めに要る)
          (ruby-adv (loop for ch across ruby-string
                          sum (glyph-advance font ch rsize))))
     (ruby-mono base-adv asc (- size asc) (string base-ch) size
-               ruby-adv ruby-string rsize :gap gap)))
+               ruby-adv ruby-string rsize rasc :gap gap)))
 
 (defun text-items (codes font size &key (kinsoku t) (ruleset (default-ruleset)))
   "コードポイント列を item 列にする。source-start/end も埋める (逆写像)。

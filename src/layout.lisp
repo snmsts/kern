@@ -131,19 +131,31 @@
                           :glyph-offset offset
                           :source-start start :source-end end)))))
 
-(defun mono-ruby-box (font size base-code ruby-string &key (gap 0))
+(defun kanji-code-p (code)
+  "CJK 統合漢字か。オーバーハングの except-kanji 判定用 (仮名・記号は nil)。"
+  (or (<= #x4E00 code #x9FFF)     ; CJK Unified Ideographs
+      (<= #x3400 code #x4DBF)     ; Ext A
+      (<= #xF900 code #xFAFF)))   ; Compatibility Ideographs
+
+(defun mono-ruby-box (font size base-code ruby-string
+                      &key (gap 0) overhang-left-p overhang-right-p)
   "親1字 (BASE-CODE) にルビ文字列 (RUBY-STRING) を振ったモノルビ ruby-box。
-   フォント計測を引き受ける実 API。ルビは半分サイズ、オーバーハング無し。
-   親は full-width 前提。descent は em 枠から ascent を引いた近似。"
+   フォント計測を引き受ける実 API。ルビは半分サイズ。
+   OVERHANG-LEFT-P/RIGHT-P が真の側は、ルビ>親のとき隣へ食い込ませる (呼び手が
+   隣が仮名か等で決める)。食い込み量は各側 min((ルビ−親)/2, ルビサイズ) で上限をかける
+   (AH 既定 limit-overhang = 1.0 × ルビフォントサイズ)。"
   (let* ((base-ch  (code-char base-code))
          (base-adv (glyph-advance font base-ch size))
          (asc      (font-ascent* font size))
          (rsize    (/ size 2))
-         (rasc     (font-ascent* font rsize))   ; ルビ ascent (baseline 決めに要る)
+         (rasc     (font-ascent* font rsize))
          (ruby-adv (loop for ch across ruby-string
-                         sum (glyph-advance font ch rsize))))
+                         sum (glyph-advance font ch rsize)))
+         (per-side (min (/ (max 0 (- ruby-adv base-adv)) 2) rsize)))
     (ruby-mono base-adv asc (- size asc) (string base-ch) size
-               ruby-adv ruby-string rsize rasc :gap gap)))
+               ruby-adv ruby-string rsize rasc :gap gap
+               :overhang-left  (if overhang-left-p  per-side 0)
+               :overhang-right (if overhang-right-p per-side 0))))
 
 (defun group-ruby-box (font size base-string ruby-string &key (gap 0))
   "グループルビ: 親文字列 BASE-STRING 全体に1つのルビ文字列 RUBY-STRING を均等配置。

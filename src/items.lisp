@@ -13,7 +13,7 @@
            #:box #:ascent #:descent #:protrusion
            #:glyph-box #:box-font #:box-glyphs #:glyph-offset
            #:ruby-box #:ruby-placements #:ruby-mono #:mono-ruby-box
-           #:ruby-group #:group-ruby-box #:distribute-even
+           #:ruby-group #:group-ruby-box #:distribute-even #:kanji-code-p
            #:make-placed #:placed-x #:placed-y #:placed-size #:placed-string
            #:glue #:stretch #:shrink #:stretch-order #:shrink-order
            #:stretch-priority #:shrink-priority #:glue-ratio
@@ -133,19 +133,27 @@
   ((placements :initarg :placements :initform nil :accessor ruby-placements)))
 
 (defun ruby-mono (base-advance base-ascent base-descent base-string base-size
-                  ruby-advance ruby-string ruby-size ruby-ascent &key (gap 0))
-  "モノルビ (親1字 + ルビ1組) の ruby-box。オーバーハング無し。
-   ルビ>親なら箱を max(親,ルビ) 幅へ広げ、親・ルビとも中央に置く (JLReq: モノは中央揃え)。
+                  ruby-advance ruby-string ruby-size ruby-ascent
+                  &key (gap 0) (overhang-left 0) (overhang-right 0))
+  "モノルビ (親1字 + ルビ1組) の ruby-box。
 
-   ★ルビの baseline は 親ascent + ルビdescent + gap の高さに置く。ルビ descent 分だけ
-     浮かせるのは、ルビ字面の下端 (baseline−descent) が親 ascent にちょうど接するようにするため。
-     luatexja の ruby もこの位置 (baseline = 親ascent+ルビdescent) にある (compare/ で実測)。
-   ★箱 ascent = rise + ルビascent = 親ascent + ルビsize + gap。gap=0 なら 親ascent+ルビsize。"
-  (let* ((adv          (max base-advance ruby-advance))
-         (ruby-descent (- ruby-size ruby-ascent))
+   ★ルビの baseline は 親ascent + ルビdescent + gap の高さ。ルビ descent 分だけ浮かせ、
+     ルビ字面の下端が親 ascent に接する (luatexja と一致、compare/ で実測)。
+   ★ルビ<=親: 箱=親幅、親 x=0・ルビ中央。
+   ★ルビ>親: OVERHANG-LEFT/RIGHT は各側で隣へ食い込ませてよい量 (呼び手が上限つきで決める)。
+     箱 advance = ルビ幅 − 食い込み左 − 食い込み右 (親幅を下回らない)。ルビは箱左端から
+     −食い込み左 の位置に置き、両隣の領域へはみ出す。両側フル食い込みなら箱=親幅
+     (luatexja の『箱=親幅 + ルビ shifted』と一致)。食い込み0なら箱=ルビ幅 (単独/漢字隣)。"
+  (let* ((ruby-descent (- ruby-size ruby-ascent))
          (rise         (+ base-ascent ruby-descent gap))
+         (over         (> ruby-advance base-advance))
+         (adv          (if over
+                           (max base-advance (- ruby-advance overhang-left overhang-right))
+                           base-advance))
          (base-x       (/ (- adv base-advance) 2))
-         (ruby-x       (/ (- adv ruby-advance) 2)))
+         (ruby-x       (if over
+                           (- overhang-left)
+                           (/ (- adv ruby-advance) 2))))
     (make-instance 'ruby-box
                    :advance adv
                    :ascent  (+ rise ruby-ascent)

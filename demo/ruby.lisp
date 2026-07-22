@@ -8,31 +8,47 @@
 
 (in-package #:kern)
 
+(defun unit-lead-code (u)
+  "UNIT の先頭の親コードポイント (overhang の except-kanji 判定に使う)。"
+  (cond ((integerp u) u)
+        ((eq (first u) :group) (first (second u)))
+        (t (first u))))
+
 (defun ruby-demo-items (font size units)
   "UNITS を item 列にする。要素:
      整数                     → 通常字
-     (親 . ルビコード列)       → モノルビ
+     (親 . ルビコード列)       → モノルビ (ルビ>親なら隣が仮名の側へ overhang)
      (:group (親列) (ルビ列)) → グループルビ
-   隣接和文の間に JFM のクラス対 glue を入れる。"
-  (let ((rs (default-ruleset)) (items '()) (prev nil))
-    (dolist (u units)
-      (multiple-value-bind (box code)
-          (cond
-            ((integerp u) (values (emit-char-box rs font size u 0 0) u))
-            ((eq (first u) :group)
-             (values (group-ruby-box font size
-                                     (map 'string #'code-char (second u))
-                                     (map 'string #'code-char (third u)))
-                     (first (second u))))
-            (t (values (mono-ruby-box font size (first u)
-                                      (map 'string #'code-char (rest u)))
-                       (first u))))
-        (let ((class (char-class-of rs code)))
-          (when prev
-            (let ((g (inter-glue rs prev class size)))
-              (when g (push g items))))
-          (push box items)
-          (setf prev class))))
+   隣接和文の間に JFM のクラス対 glue を入れる。
+   ★モノルビの overhang 可否は隣接ユニットの先頭が漢字か否かで決める (except-kanji)。
+     隣が無い/漢字なら食い込まない、仮名等なら食い込む。行頭行末の抑制は未実装。"
+  (let* ((rs (default-ruleset))
+         (vec (coerce units 'vector))
+         (n (length vec))
+         (items '()) (prev nil))
+    (dotimes (i n)
+      (let ((u (aref vec i)))
+        (multiple-value-bind (box code)
+            (cond
+              ((integerp u) (values (emit-char-box rs font size u 0 0) u))
+              ((eq (first u) :group)
+               (values (group-ruby-box font size
+                                       (map 'string #'code-char (second u))
+                                       (map 'string #'code-char (third u)))
+                       (first (second u))))
+              (t (let* ((lc (when (> i 0)        (unit-lead-code (aref vec (1- i)))))
+                        (rc (when (< (1+ i) n)   (unit-lead-code (aref vec (1+ i))))))
+                   (values (mono-ruby-box font size (first u)
+                                          (map 'string #'code-char (rest u))
+                                          :overhang-left-p  (and lc (not (kanji-code-p lc)))
+                                          :overhang-right-p (and rc (not (kanji-code-p rc))))
+                           (first u)))))
+          (let ((class (char-class-of rs code)))
+            (when prev
+              (let ((g (inter-glue rs prev class size)))
+                (when g (push g items))))
+            (push box items)
+            (setf prev class)))))
     (nreverse items)))
 
 (defun ruby-demo-codes (units)
@@ -59,14 +75,20 @@
         #x3000                        ; 全角スペース
         (list :group (list #x5927 #x4EBA) (list #x304A #x3068 #x306A)) ; 大人(おとな) グループ
         #x3000                        ; 全角スペース
-        #x30C6 #x30B9 #x30C8))        ; テスト
+        #x30C6 #x30B9 #x30C8          ; テスト
+        #x3000                        ; 全角スペース
+        ;; overhang 対比: ルビ>親の 都(みやこ)。隣が仮名(の/に)=食い込む
+        #x306E (list #x90FD #x307F #x3084 #x3053) #x306B  ; の 都(みやこ) に
+        #x3000                        ; 全角スペース
+        ;; 隣が漢字(京/府)=食い込まない (except-kanji) → 箱がルビ幅に広がる
+        #x4EAC (list #x90FD #x307F #x3084 #x3053) #x5E9C)) ; 京 都(みやこ) 府
 
 (defun run-ruby-pdf (&key (size 24) (units *ruby-sample*))
   "ルビ付きの1行を組んで PDF に描く。"
   (let* ((fm    (pdf:load-ttf-font *ttf*))
          (font  (pdf:get-font (pdf::font-name fm)))
          (codes (ruby-demo-codes units))
-         (width (* size 12))
+         (width (* size 22))
          (items (coerce (finish-paragraph (ruby-demo-items font size units)) 'vector))
          (lines (layout-items items width size)))
     (format t "~&=== ルビ PDF デモ ===~%")

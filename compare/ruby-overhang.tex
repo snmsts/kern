@@ -1,0 +1,26 @@
+% ruby-overhang.tex -- ルビ>親のオーバーハングを luatexja から実測
+% 都(10) に みやこ(15) = ルビ 5pt 長い。隣が仮名なら食い込め、漢字なら食い込めない
+% (AH 既定 except-kanji)。box 構造・kern・glue がどう変わるかを見る。
+%   docker run --rm -v "$(pwd -W):/work" -w /work/compare texlive/texlive \
+%     lualatex -interaction=nonstopmode ruby-overhang.tex
+
+\documentclass[fontsize=10pt]{jlreq}
+\usepackage{luatexja-ruby}
+\showboxdepth=10
+\showboxbreadth=1000
+
+\begin{document}
+
+% (A) 隣が仮名: の 都(みやこ) に — 両隣へ食い込めるはず
+\setbox0=\hbox{の\ruby{都}{みやこ}に}
+\showbox0
+
+% (B) 隣が漢字: 京 都(みやこ) 府 — except-kanji で食い込めない → アキが要る
+\setbox1=\hbox{京\ruby{都}{みやこ}府}
+\showbox1
+
+% (C) 単独 (隣なし=行頭行末相当): 都(みやこ) だけ
+\setbox2=\hbox{\ruby{都}{みやこ}}
+\showbox2
+
+\end{document}

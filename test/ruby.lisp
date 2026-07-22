@@ -87,8 +87,29 @@
       (la-check= (placed-x r3) 85/6 "ルビ な x=85/6 (luatexja と一致)")
       (la-check= (placed-y r1) 47/5 "ルビ rise=9.4"))))
 
+(defun test-ruby-overhang ()
+  ;; ルビ>親 (都10 / みやこ15) の overhang 幾何。luatexja 実測 (compare/ruby-overhang) と一致。
+  ;; 両側食い込み2.5: 箱=親幅10、ルビは -2.5 から (両隣へはみ出す)。
+  (let ((rb (ruby-mono 10 44/5 6/5 "都" 10 15 "みやこ" 5 22/5
+                       :overhang-left 5/2 :overhang-right 5/2)))
+    (la-check= (advance rb) 10 "overhang両側: 箱=親幅10 (ルビ幅15−食込5)")
+    (la-check= (placed-x (first  (ruby-placements rb))) 0    "親 x=0")
+    (la-check= (placed-x (second (ruby-placements rb))) -5/2 "ルビ x=-2.5 (左へはみ出す)"))
+  ;; 食い込み0 (単独/漢字隣): 箱=ルビ幅15、親中央。
+  (let ((rb (ruby-mono 10 44/5 6/5 "都" 10 15 "みやこ" 5 22/5)))
+    (la-check= (advance rb) 15 "overhang無: 箱=ルビ幅15")
+    (la-check= (placed-x (first  (ruby-placements rb))) 5/2 "親 中央 x=2.5")
+    (la-check= (placed-x (second (ruby-placements rb))) 0   "ルビ x=0"))
+  ;; 片側のみ (右2.5): 箱=12.5。
+  (la-check= (advance (ruby-mono 10 44/5 6/5 "都" 10 15 "みやこ" 5 22/5 :overhang-right 5/2))
+             25/2 "片側overhang: 箱=12.5")
+  ;; except-kanji 判定
+  (la-check (kanji-code-p #x90FD)         "都 は漢字")
+  (la-check (not (kanji-code-p #x306E))   "の は仮名 (非漢字)")
+  (la-check (not (kanji-code-p #x30C6))   "テ は仮名 (非漢字)"))
+
 (defun run-ruby-tests ()
-  "ルビ (モノ + グループ, オーバーハング無し) の回帰テスト。全通過なら T。"
+  "ルビ (モノ + グループ + overhang) の回帰テスト。全通過なら T。"
   (setf *la-checks* 0 *la-fails* 0)
   (test-ruby-mono-shorter)
   (test-ruby-mono-longer)
@@ -96,6 +117,7 @@
   (test-ruby-emission-in-line)
   (test-distribute-even)
   (test-ruby-group)
+  (test-ruby-overhang)
   (format t "~&ruby (mono, no-overhang): ~a/~a checks passed~a~%"
           (- *la-checks* *la-fails*) *la-checks*
           (if (zerop *la-fails*) "  OK" "  *** FAIL ***"))

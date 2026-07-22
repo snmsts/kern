@@ -63,13 +63,39 @@
         (la-check (equal g3 (list 20   94/5 10 "かん")) "ルビ かん (箱x20, rise18.8, 半分10)")
         (la-check (equal g4 (list 40   0    20 "文"))   "文 (40,0,20)")))))
 
+(defun test-distribute-even ()
+  ;; 均等配置: 両端=字間の半分 (JLReq グループルビ)。
+  (la-check (equal (distribute-even (list 5 5 5) 20) (list 5/6 15/2 85/6))
+            "均等 3@5→20: 端5/6 字間5/3")
+  (la-check (equal (distribute-even (list 5 5 5 5) 20) (list 0 5 10 15))
+            "ぴったり(extra0)は連続")
+  (la-check (equal (distribute-even (list 10) 20) (list 5))
+            "1個は中央 (extra/2)"))
+
+(defun test-ruby-group ()
+  ;; グループルビ 大人(20)/おとな(15<20)。親=自然位置、ルビ=均等配置。
+  ;; luatexja 実測 (compare/ruby-group): 親 0,10 / ルビ 5/6, 15/2, 85/6。
+  (let ((rb (ruby-group (list "大" "人") (list 10 10) 10 44/5 6/5
+                        (list "お" "と" "な") (list 5 5 5) 5 22/5)))
+    (la-check= (advance rb) 20   "グループ: 箱幅=親20 (ルビ<親)")
+    (la-check= (ascent rb)  69/5 "グループ: ascent 13.8")
+    (destructuring-bind (b1 b2 r1 r2 r3) (ruby-placements rb)
+      (la-check= (placed-x b1) 0    "親 大 x=0 (自然)")
+      (la-check= (placed-x b2) 10   "親 人 x=10 (自然)")
+      (la-check= (placed-x r1) 5/6  "ルビ お x=5/6 (両端=字間半分)")
+      (la-check= (placed-x r2) 15/2 "ルビ と x=15/2")
+      (la-check= (placed-x r3) 85/6 "ルビ な x=85/6 (luatexja と一致)")
+      (la-check= (placed-y r1) 47/5 "ルビ rise=9.4"))))
+
 (defun run-ruby-tests ()
-  "ルビ段1 (モノ・オーバーハング無し) の回帰テスト。全通過なら T。"
+  "ルビ (モノ + グループ, オーバーハング無し) の回帰テスト。全通過なら T。"
   (setf *la-checks* 0 *la-fails* 0)
   (test-ruby-mono-shorter)
   (test-ruby-mono-longer)
   (test-ruby-gap)
   (test-ruby-emission-in-line)
+  (test-distribute-even)
+  (test-ruby-group)
   (format t "~&ruby (mono, no-overhang): ~a/~a checks passed~a~%"
           (- *la-checks* *la-fails*) *la-checks*
           (if (zerop *la-fails*) "  OK" "  *** FAIL ***"))

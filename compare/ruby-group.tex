@@ -1,0 +1,21 @@
+% ruby-group.tex -- グループルビの均等配置を luatexja から実測
+% | 無し = グループルビ。おとな(3, 15pt) を 大人(2, 20pt) に均等配置する。
+%   docker run --rm -v "$(pwd -W):/work" -w /work/compare texlive/texlive \
+%     lualatex -interaction=nonstopmode ruby-group.tex
+
+\documentclass[fontsize=10pt]{jlreq}
+\usepackage{luatexja-ruby}
+\showboxdepth=10
+\showboxbreadth=1000
+
+\begin{document}
+
+% グループルビ: ルビ(おとな=15) < 親(大人=20)。ルビ字がどう散るか。
+\setbox0=\hbox{\ruby{大人}{おとな}}
+\showbox0
+
+% 均等の別例: ルビ(4字=20) = 親(2字=20)。ぴったりの時。
+\setbox1=\hbox{\ruby{熟語}{じゅくご}}
+\showbox1
+
+\end{document}

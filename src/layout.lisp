@@ -145,6 +145,17 @@
     (ruby-mono base-adv asc (- size asc) (string base-ch) size
                ruby-adv ruby-string rsize rasc :gap gap)))
 
+(defun group-ruby-box (font size base-string ruby-string &key (gap 0))
+  "グループルビ: 親文字列 BASE-STRING 全体に1つのルビ文字列 RUBY-STRING を均等配置。
+   フォント計測を引き受ける実 API。両文字列とも1字ずつ幅を測って ruby-group に渡す。"
+  (let* ((asc   (font-ascent* font size))
+         (rsize (/ size 2))
+         (rasc  (font-ascent* font rsize)))
+    (flet ((chars  (s) (map 'list #'string s))
+           (widths (s sz) (map 'list (lambda (ch) (glyph-advance font ch sz)) s)))
+      (ruby-group (chars base-string) (widths base-string size) size asc (- size asc)
+                  (chars ruby-string) (widths ruby-string rsize) rsize rasc :gap gap))))
+
 (defun text-items (codes font size &key (kinsoku t) (ruleset (default-ruleset)))
   "コードポイント列を item 列にする。source-start/end も埋める (逆写像)。
 

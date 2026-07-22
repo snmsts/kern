@@ -13,6 +13,7 @@
            #:box #:ascent #:descent #:protrusion
            #:glyph-box #:box-font #:box-glyphs #:glyph-offset
            #:ruby-box #:ruby-placements #:ruby-mono #:mono-ruby-box
+           #:ruby-group #:group-ruby-box #:distribute-even
            #:make-placed #:placed-x #:placed-y #:placed-size #:placed-string
            #:glue #:stretch #:shrink #:stretch-order #:shrink-order
            #:stretch-priority #:shrink-priority #:glue-ratio
@@ -82,6 +83,28 @@
    (glyph-offset :initarg :glyph-offset :initform 0 :accessor glyph-offset :type len)))
 
 ;;; ---------------------------------------------------------------------------
+;;; 均等配置 -- JLReq グループルビ (§3.3.6)。両端の空き = 字間の半分。
+;;; ---------------------------------------------------------------------------
+;;; WIDTHS の各要素を TOTAL-WIDTH に均等に散らし、各要素の左端 x の list を返す。
+;;;   余り extra を 2N 単位に割り、字間=2単位・両端=1単位 (= 字間の半分)。
+;;;   extra<=0 (詰まってる/ぴったり) なら中央寄せで連続配置。
+;;; luatexja の fil 配分 1:2:…:2:1 と一致 (compare/ruby-group で実測)。
+
+(defun distribute-even (widths total-width)
+  (let* ((n (length widths))
+         (glyphs-w (reduce #'+ widths :initial-value 0))
+         (extra (- total-width glyphs-w)))
+    (if (or (<= n 1) (<= extra 0))
+        (let ((x (/ (max 0 extra) 2)) (xs '()))
+          (dolist (w widths (nreverse xs)) (push x xs) (incf x w)))
+        (let ((end (/ extra (* 2 n)))        ; 両端 = extra/(2N)
+              (internal (/ extra n)))         ; 字間 = extra/N = 2*end
+          (let ((x end) (xs '()))
+            (dolist (w widths (nreverse xs))
+              (push x xs)
+              (incf x (+ w internal))))))))
+
+;;; ---------------------------------------------------------------------------
 ;;; 配置済みグリフ -- (x y size . 文字列)
 ;;; ---------------------------------------------------------------------------
 ;;; laid-line の glyph 列と ruby-box の placements が共有する形。
@@ -129,6 +152,30 @@
                    :descent base-descent
                    :placements (list (make-placed base-x 0    base-size base-string)
                                      (make-placed ruby-x rise ruby-size ruby-string)))))
+
+(defun ruby-group (base-strings base-widths base-size base-ascent base-descent
+                   ruby-strings ruby-widths ruby-size ruby-ascent &key (gap 0))
+  "グループルビ (親複数字に1ルビ)。BASE-STRINGS/RUBY-STRINGS は1字文字列の list、
+   *-WIDTHS はそれぞれの送り幅の list。JLReq §3.3.6: 広い方の幅に箱を合わせ、
+   狭い方を均等配置 (両端=字間の半分)。オーバーハング無し。
+
+   ★distribute-even を両列に適用するだけでよい: 広い列は extra=0 で連続、狭い列は
+     均等に散る。ルビ<親なら親が連続・ルビが散り、ルビ>親なら逆になる。"
+  (let* ((base-w (reduce #'+ base-widths :initial-value 0))
+         (ruby-w (reduce #'+ ruby-widths :initial-value 0))
+         (box-w  (max base-w ruby-w))
+         (ruby-descent (- ruby-size ruby-ascent))
+         (rise   (+ base-ascent ruby-descent gap))
+         (placements '()))
+    (loop for s in base-strings for x in (distribute-even base-widths box-w)
+          do (push (make-placed x 0 base-size s) placements))
+    (loop for s in ruby-strings for x in (distribute-even ruby-widths box-w)
+          do (push (make-placed x rise ruby-size s) placements))
+    (make-instance 'ruby-box
+                   :advance box-w
+                   :ascent  (+ rise ruby-ascent)
+                   :descent base-descent
+                   :placements (nreverse placements))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; glue -- 伸縮する空き。均等割りの担い手。

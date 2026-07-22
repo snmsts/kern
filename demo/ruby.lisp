@@ -9,15 +9,24 @@
 (in-package #:kern)
 
 (defun ruby-demo-items (font size units)
-  "UNITS を item 列にする。隣接和文の間に JFM のクラス対 glue を入れる。"
+  "UNITS を item 列にする。要素:
+     整数                     → 通常字
+     (親 . ルビコード列)       → モノルビ
+     (:group (親列) (ルビ列)) → グループルビ
+   隣接和文の間に JFM のクラス対 glue を入れる。"
   (let ((rs (default-ruleset)) (items '()) (prev nil))
     (dolist (u units)
       (multiple-value-bind (box code)
-          (if (consp u)
-              (values (mono-ruby-box font size (first u)
-                                     (map 'string #'code-char (rest u)))
-                      (first u))
-              (values (emit-char-box rs font size u 0 0) u))
+          (cond
+            ((integerp u) (values (emit-char-box rs font size u 0 0) u))
+            ((eq (first u) :group)
+             (values (group-ruby-box font size
+                                     (map 'string #'code-char (second u))
+                                     (map 'string #'code-char (third u)))
+                     (first (second u))))
+            (t (values (mono-ruby-box font size (first u)
+                                      (map 'string #'code-char (rest u)))
+                       (first u))))
         (let ((class (char-class-of rs code)))
           (when prev
             (let ((g (inter-glue rs prev class size)))
@@ -30,10 +39,13 @@
   "サブセット化に要る全コードポイント (親 + ルビ)。"
   (let ((codes '()))
     (dolist (u units)
-      (if (consp u)
-          (progn (push (first u) codes)
-                 (dolist (r (rest u)) (push r codes)))
-          (push u codes)))
+      (cond
+        ((integerp u) (push u codes))
+        ((eq (first u) :group)
+         (dolist (c (second u)) (push c codes))
+         (dolist (c (third u))  (push c codes)))
+        (t (push (first u) codes)
+           (dolist (r (rest u)) (push r codes)))))
     (coerce (nreverse codes) 'vector)))
 
 ;;; 「漢字にルビを振る テスト」相当。親コード + ルビのコードポイント列。
@@ -44,6 +56,8 @@
         #x306B                        ; に
         (list #x632F #x3075)          ; 振 + ふ
         #x308B                        ; る
+        #x3000                        ; 全角スペース
+        (list :group (list #x5927 #x4EBA) (list #x304A #x3068 #x306A)) ; 大人(おとな) グループ
         #x3000                        ; 全角スペース
         #x30C6 #x30B9 #x30C8))        ; テスト
 

@@ -48,7 +48,9 @@ direction", so vertical is a coordinate change, not a rewrite).
 - **PDF output** through cl-pdf, with font subsetting and `/ToUnicode`
   (searchable, copy-pasteable).
 - **Document layer**: `:document` / `:p` / `:h1` / `:h2` / `:ruby` /
-  `:group` / `:jukugo` / `:em`, first-line indent.
+  `:group` / `:jukugo` / `:em`, first-line indent, and `:font` — font
+  mixing down to a single character (`(:font :gothic "この語だけ")`),
+  composing with ruby.
 
 Deferred, and marked as such in `DESIGN.md`: vertical punctuation corner
 placement and bracket rotation (needs the vertical JFM), 縦中横, breaking
@@ -80,6 +82,10 @@ ros run -- --load load.lisp
 ;; fonts are pluggable — the engine only ever asks a font for metrics
 ;; through generic functions, so any single-face .ttf works:
 (kern::run-document-pdf :ttf #P"/path/to/another.ttf")
+
+;; and a document can mix fonts mid-text via :fonts + (:font key …):
+;;   (:document (:fonts (:db "…/yumindb.ttf"))
+;;     (:p "本文は明朝、" (:font :db "この語だけ太字") "、また明朝。"))
 ```
 
 Tests need only the core — no cl-pdf, no fonts:

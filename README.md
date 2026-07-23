@@ -83,9 +83,10 @@ sh setup.sh
   reads at run time, from [abenori/jlreq](https://github.com/abenori/jlreq)
   (BSD-2).
 
-Neither is needed for the **core** — `(asdf:test-system "kern")` runs on a
-bare Lisp. They are only for the PDF demos, which also load a single-face
-`.ttf` Japanese font (游明朝 by default; switchable, see below).
+The **core** and its tests need only `vendor/jlreq/jfm-jlreq.lua` (read at
+run time) — no cl-pdf, no font. `(asdf:test-system "kern")` passes with
+just that. cl-pdf and a single-face `.ttf` Japanese font (游明朝 by
+default; switchable, see below) are only for the PDF demos.
 
 ```lisp
 ;; fetch vendor deps once: sh setup.sh

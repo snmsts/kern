@@ -8,16 +8,25 @@
 (defun codes-of (s) (map 'list #'char-code s))
 
 (defun test-document-parse ()
-  ;; %inline-atoms: 文字列は各字コードへ、ruby 形はそのまま atom に。
-  (la-check (equal (%inline-atoms (list "ab" (list :ruby "猫" "ねこ") "c"))
-                   (append (codes-of "ab") (list (list :ruby "猫" "ねこ")) (codes-of "c")))
-            "inline 平坦化")
+  ;; %inline-atoms: (atom . font) 対へ平坦化。文字列は各字、ruby 形はそのまま。font=nil。
+  (la-check (equal (%inline-atoms (list "ab" (list :ruby "猫" "ねこ") "c") nil nil)
+                   (append (mapcar (lambda (c) (cons c nil)) (codes-of "ab"))
+                           (list (cons (list :ruby "猫" "ねこ") nil))
+                           (mapcar (lambda (c) (cons c nil)) (codes-of "c"))))
+            "inline 平坦化 (atom . font)")
+  ;; (:font key ...) で font が切り替わる。
+  (la-check (equal (%inline-atoms (list "a" (list :font :g "b") "c") :def (list :g :gothic))
+                   (list (cons (char-code #\a) :def)
+                         (cons (char-code #\b) :gothic)
+                         (cons (char-code #\c) :def)))
+            "(:font key ...) で最小単位フォント切替")
   ;; %atom-code: ruby 形の先頭は base の先頭字。
   (la-check= (%atom-code (list :ruby "猫" "ねこ")) (char-code #\猫) "ruby atom の code=base先頭")
   (la-check= (%atom-code 65) 65 "整数 atom はそのまま")
   ;; :em → 各字を圏点 atom (:kenten code) へ展開。
-  (la-check (equal (%inline-atoms (list (list :em "強調")))
-                   (list (list :kenten (char-code #\強)) (list :kenten (char-code #\調))))
+  (la-check (equal (%inline-atoms (list (list :em "強調")) nil nil)
+                   (list (cons (list :kenten (char-code #\強)) nil)
+                         (cons (list :kenten (char-code #\調)) nil)))
             ":em → 各字 :kenten")
   (la-check= (%atom-code (list :kenten (char-code #\強))) (char-code #\強) ":kenten atom の code")
   (let ((doc (list :document (list :p (list :em "強")))))

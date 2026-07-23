@@ -29,7 +29,7 @@
    グリフだけを連結すると『和欧間のアキが入ったか』が出力から確かめられず、
    欧文の単語間まで消えて見えるので、診断として使い物にならない。"
   (let ((events (sort (append
-                       (mapcar (lambda (g) (list (placed-x g) :glyph (placed-string g))) (line-glyphs line))
+                       (mapcar (lambda (g) (list (lg-x g) :glyph (lg-string g))) (line-glyphs line))
                        (mapcar (lambda (g) (list (car g) :gap (cdr g)))   (line-gaps line)))
                       #'< :key #'first)))
     (with-output-to-string (s)
@@ -39,7 +39,7 @@
           (:gap (when (>= (third e) threshold) (write-char #\Space s))))))))
 
 (defun glyphs-only (line)
-  (apply #'concatenate 'string (mapcar #'placed-string (line-glyphs line))))
+  (apply #'concatenate 'string (mapcar #'lg-string (line-glyphs line))))
 
 (defun check-lines (lines &optional (rs (default-ruleset)))
   "禁則が守られたか数える。"

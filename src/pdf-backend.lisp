@@ -57,15 +57,16 @@
           do (multiple-value-bind (ox oy) (line-origin i)
                (pdf:in-text-mode
                  (pdf:move-text ox oy)
-                 (let ((last-x 0) (last-y 0) (cur-size nil))
+                 (let ((last-x 0) (last-y 0) (cur-size nil) (cur-font nil))
                    (dolist (g (line-glyphs line))
-                     (multiple-value-bind (gx gy) (glyph-xy (placed-x g) (placed-y g))
-                       (let ((gsize (placed-size g)))
-                         (unless (eql gsize cur-size)
-                           (pdf:set-font font gsize)
-                           (setf cur-size gsize))
+                     (multiple-value-bind (gx gy) (glyph-xy (lg-x g) (lg-y g))
+                       (let ((gsize (lg-size g))
+                             (gfont (or (lg-font g) font)))  ; glyph の font 優先、無ければ既定
+                         (unless (and (eql gsize cur-size) (eq gfont cur-font))
+                           (pdf:set-font gfont gsize)
+                           (setf cur-size gsize cur-font gfont))
                          (pdf:move-text (float (- gx last-x)) (float (- gy last-y)))
-                         (pdf:draw-text (placed-string g))
+                         (pdf:draw-text (lg-string g))
                          (setf last-x gx last-y gy))))))))))
 
 (defun draw-document (blocks font &key (x 60) (y 780) (direction :horizontal))

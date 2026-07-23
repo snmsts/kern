@@ -57,11 +57,12 @@
     (la-check= (line-status (first lines)) :exact "幅60=自然幅でぴったり")
     (la-check= (length gs) 4 "グリフ4つ (本 漢 かん 文)")
     (when (= (length gs) 4)
+      ;; line-glyph は (x y size font 文字列)。font は未指定なので nil。
       (destructuring-bind (g1 g2 g3 g4) gs
-        (la-check (equal g1 (list 0    0    20 "本"))   "本 (0,0,20)")
-        (la-check (equal g2 (list 20   0    20 "漢"))   "ルビ親 漢 (箱x20+中央0)")
-        (la-check (equal g3 (list 20   94/5 10 "かん")) "ルビ かん (箱x20, rise18.8, 半分10)")
-        (la-check (equal g4 (list 40   0    20 "文"))   "文 (40,0,20)")))))
+        (la-check (equal g1 (list 0    0    20 nil "本"))   "本 (0,0,20)")
+        (la-check (equal g2 (list 20   0    20 nil "漢"))   "ルビ親 漢 (箱x20+中央0)")
+        (la-check (equal g3 (list 20   94/5 10 nil "かん")) "ルビ かん (箱x20, rise18.8, 半分10)")
+        (la-check (equal g4 (list 40   0    20 nil "文"))   "文 (40,0,20)")))))
 
 (defun test-distribute-even ()
   ;; 均等配置: 両端=字間の半分 (JLReq グループルビ)。

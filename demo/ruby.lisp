@@ -117,8 +117,8 @@
             (count-if (lambda (it) (typep it 'ruby-box)) items))
     ;; 各行のグリフを y でグループ表示 (親=y0, ルビ=y>0)
     (dolist (l lines)
-      (let ((base (count-if (lambda (g) (zerop (placed-y g))) (line-glyphs l)))
-            (ruby (count-if (lambda (g) (plusp (placed-y g))) (line-glyphs l))))
+      (let ((base (count-if (lambda (g) (zerop (lg-y g))) (line-glyphs l)))
+            (ruby (count-if (lambda (g) (plusp (lg-y g))) (line-glyphs l))))
         (format t "    line: 親グリフ ~d / ルビグリフ ~d  status=~a~%"
                 base ruby (line-status l))))
     (install-subset fm *ttf* codes)

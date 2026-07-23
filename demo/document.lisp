@@ -6,7 +6,8 @@
 (in-package #:kern)
 
 (defparameter *sample-doc*
-  '(:document (:size 14 :line-width 294)
+  ;; :fonts は key→パス。(:font :db ...) でその範囲だけ游明朝 Demibold に切り替わる。
+  '(:document (:size 14 :line-width 294 :fonts (:db "C:/Windows/Fonts/yumindb.ttf"))
     (:h1 (:group "組版" "くみはん") "エンジン" (:group "試験" "しけん"))
     (:p "吾輩は" (:ruby "猫" "ねこ") "である。"
         (:ruby "名" "な") (:ruby "前" "まえ") "はまだ" (:ruby "無" "な") "い。")
@@ -15,8 +16,10 @@
     (:h2 "ルビの" (:ruby "種" "しゅ") "類")
     (:p "これは" (:group "組版" "くみはん") "エンジンの" (:group "試験" "しけん") "である。"
         (:jukugo "二十" ("に" "じゅう")) "の" (:jukugo "名前" ("な" "まえ")) "も" (:ruby "組" "く") "める。"
-        (:em "傍点") "で" (:em "強調") "もできる。"))
-  "B 層のサンプル文書。見出し・字下げ・モノ/グループ/熟語ルビ・圏点(強調)・約物・括弧を含む。")
+        (:em "傍点") "で" (:em "強調") "もできる。")
+    (:p "フォントも" (:font :db "この語だけ游明朝デミボールド") "に"
+        (:font :db (:ruby "混" "こん") "植") "できる。字ごとに切り替わる。"))
+  "B 層のサンプル文書。見出し・字下げ・モノ/グループ/熟語ルビ・圏点・フォント切替を含む。")
 
 (defparameter *vertical-doc*
   '(:document (:size 16 :line-width 360 :direction :vertical :indent nil)
@@ -28,25 +31,38 @@
   "縦書き文書のサンプル。同じ S 式に :direction :vertical を足すだけ。
    縦ルビ (親の右) が座標写像でそのまま出るかの試験も兼ねる。")
 
+(defun %load-font (path)
+  "パス → (list パス fm font)。fm はサブセット用、font は描画・計測用。"
+  (let ((fm (pdf:load-ttf-font path)))
+    (list path fm (pdf:get-font (pdf::font-name fm)))))
+
 (defun run-document-pdf (&key (doc *sample-doc*) (out (rel "demo/document.pdf")) (ttf *ttf*))
   "S 式文書を組んで PDF に描く。B 層の端から端まで。:direction は文書 opts から。
-   :ttf で組むフォントを差し替えられる (単体 .ttf。既定は游明朝)。エンジンは総称関数の
-   協定越しにしか触らないので、cl-pdf が読める TTF なら何でも差し替わる。"
-  (let* ((fm     (pdf:load-ttf-font ttf))
-         (font   (pdf:get-font (pdf::font-name fm)))
-         (dir    (getf (document-options doc) :direction :horizontal))
-         (blocks (layout-document doc font))
-         (codes  (document-codes doc)))
+   既定フォントは :ttf、文書 opts の :fonts (key→パス) で名前付きフォントを足せる。
+   (:font key ...) でその範囲だけ切り替わる。各フォントは総称関数の協定越しに使われる。"
+  (let* ((dir      (getf (document-options doc) :direction :horizontal))
+         (default  (%load-font ttf))                        ; (path fm font)
+         ;; 文書 opts の :fonts (key path key path ...) を読み込む
+         (named    (loop for (key path) on (getf (document-options doc) :fonts) by #'cddr
+                         collect (cons key (%load-font path))))
+         (fonts-pl (loop for (key . spec) in named append (list key (third spec)))) ; key→font
+         (blocks   (layout-document doc (third default) :fonts fonts-pl))
+         (codes    (document-codes doc)))
     (format t "~&=== B 層 (S 式文書) デモ [~a] ===~%" dir)
-    (format t "  フォント : ~a~%" (pdf::font-name fm))
+    (format t "  フォント : ~a~{ + ~a~}~%" (pdf::font-name (second default))
+            (loop for (key . spec) in named collect (pdf::font-name (second spec))))
     (format t "  ブロック : ~d  各行数 ~{~d~^ ~}~%"
             (length blocks) (mapcar (lambda (b) (length (lb-lines b))) blocks))
-    (install-subset fm ttf codes)
+    ;; 全フォントをサブセット化 (簡便に union codes。各フォントは持つ字だけ埋める)。
+    (dolist (spec (cons default (mapcar #'cdr named)))
+      (destructuring-bind (path fm font) spec (declare (ignore font))
+        (install-subset fm path codes)))
     (pdf:with-document ()
       (pdf:with-page ()
-        ;; 縦組みは右上から列を左へ。横組みは左上から行を下へ。
-        (draw-document blocks font :x (if (eq dir :vertical) 540 60) :y 800 :direction dir)
-        (install-tounicode font codes))
+        (draw-document blocks (third default) :x (if (eq dir :vertical) 540 60) :y 800 :direction dir)
+        ;; 描画後 (フォント登録後) に各フォントへ /ToUnicode を注入。
+        (dolist (spec (cons default (mapcar #'cdr named)))
+          (install-tounicode (third spec) codes)))
       (pdf:write-document out))
     (format t "  PDF      : ~a (~:d bytes)~%" out
             (with-open-file (in out :element-type '(unsigned-byte 8)) (file-length in)))))

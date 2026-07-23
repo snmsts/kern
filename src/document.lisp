@@ -18,18 +18,26 @@
 (defparameter *kenten-mark* "﹅"
   "圏点 (強調の傍点)。JLReq の既定はゴマ点。各字の上 (縦組みでは右) に付く。")
 
-(defun %inline-atoms (content)
-  "インライン内容を atom の list へ平坦化。
+(defun %inline-atoms (content default-font fonts)
+  "インライン内容を (atom . font) 対の list へ平坦化。
    atom = 文字コード (通常字) / ruby 形 / (:kenten コード) (圏点付き1字)。
-   (:em \"強調\") は各字を圏点 atom へ展開する。"
-  (let ((atoms '()))
-    (dolist (node content)
-      (cond
-        ((stringp node) (loop for ch across node do (push (char-code ch) atoms)))
-        ((eq (first node) :em)
-         (loop for ch across (second node) do (push (list :kenten (char-code ch)) atoms)))
-        (t (push node atoms))))
-    (nreverse atoms)))
+   (:em \"強調\")      → 各字を圏点 atom へ展開。
+   (:font key sub...)  → sub を FONTS[key] のフォントで展開 (最小単位でフォント切替)。
+   FONTS は key→font の plist。DEFAULT-FONT は :font で包まれない文字のフォント。"
+  (let ((out '()))
+    (labels ((walk (nodes font)
+               (dolist (node nodes)
+                 (cond
+                   ((stringp node)
+                    (loop for ch across node do (push (cons (char-code ch) font) out)))
+                   ((eq (first node) :font)
+                    (walk (cddr node) (or (getf fonts (second node)) font)))
+                   ((eq (first node) :em)
+                    (loop for ch across (second node)
+                          do (push (cons (list :kenten (char-code ch)) font) out)))
+                   (t (push (cons node font) out))))))
+      (walk content default-font))
+    (nreverse out)))
 
 (defun %atom-code (atom)
   "atom の先頭親コード (inter-glue のクラス・overhang の隣判定に使う)。"
@@ -53,18 +61,20 @@
         (:group  (group-ruby-box  font size (second atom) (third atom)))
         (:jukugo (jukugo-ruby-box font size (second atom) (third atom))))))
 
-(defun inline->items (content font size &key (ruleset (default-ruleset)))
-  "インライン内容 (文字列と ruby 形の list) を item 列にする。
-   隣接境界に JFM のクラス対 glue (inter-glue) を入れる。text-items のルビ対応・構造化版。"
+(defun inline->items (content font size &key (ruleset (default-ruleset)) fonts)
+  "インライン内容を item 列にする。隣接境界に JFM のクラス対 glue (inter-glue)。
+   FONT は既定フォント、FONTS (key→font plist) と (:font key ...) で最小単位で切り替わる。
+   各 box はそのフォントで計測され、そのフォントで描かれる。"
   (let* ((rs ruleset)
-         (atoms (coerce (%inline-atoms content) 'vector))
+         (atoms (coerce (%inline-atoms content font fonts) 'vector))
          (n (length atoms))
          (items '()) (prev nil))
     (dotimes (i n)
-      (let* ((atom (aref atoms i))
-             (lc   (when (> i 0)      (%atom-code (aref atoms (1- i)))))
-             (rc   (when (< (1+ i) n) (%atom-code (aref atoms (1+ i)))))
-             (box  (%atom->box atom font size rs lc rc))
+      (let* ((cell  (aref atoms i))
+             (atom  (car cell)) (afont (cdr cell))
+             (lc    (when (> i 0)      (%atom-code (car (aref atoms (1- i))))))
+             (rc    (when (< (1+ i) n) (%atom-code (car (aref atoms (1+ i))))))
+             (box   (%atom->box atom afont size rs lc rc))
              (class (char-class-of rs (%atom-code atom))))
         (when prev
           (let ((g (inter-glue rs prev class size)))
@@ -104,9 +114,10 @@
   "(:document [opts] block...) の block 群。"
   (if (document-options doc) (cddr doc) (cdr doc)))
 
-(defun layout-document (doc font &key size line-width)
+(defun layout-document (doc font &key size line-width fonts)
   "S 式文書 DOC をブロックごとに組む。返り値は LAID-BLOCK の list。
    SIZE / LINE-WIDTH は引数優先、無ければ文書 opts の :size / :line-width。
+   FONT は既定フォント、FONTS (key→font plist) と (:font key ...) で最小単位で切替。
    本文段落 (:p) は全角字下げする (opts の :indent nil で無効化)。"
   (let* ((opts   (document-options doc))
          (sz     (or size (getf opts :size) 12))
@@ -116,7 +127,7 @@
           when (and (consp form) (member (first form) *block-heads*))
             collect (multiple-value-bind (bsz pitch before after indent-p)
                         (block-style (first form) sz)
-                      (let* ((inl   (inline->items (rest form) font bsz))
+                      (let* ((inl   (inline->items (rest form) font bsz :fonts fonts))
                              (items (if (and indent-p indent)
                                         (cons (make-box bsz) inl)   ; 全角字下げ
                                         inl))
@@ -133,7 +144,8 @@
                (if (stringp a)
                    (str a)
                    (ecase (first a)
-                     (:em     (str (second a)) (str *kenten-mark*))  ; 本文 + 圏点マーク
+                     (:font   (dolist (n (cddr a)) (node n)))       ; (:font key sub...)
+                     (:em     (str (second a)) (str *kenten-mark*)) ; 本文 + 圏点マーク
                      (:ruby   (str (second a)) (str (third a)))
                      (:group  (str (second a)) (str (third a)))
                      (:jukugo (str (second a)) (dolist (p (third a)) (str p)))))))

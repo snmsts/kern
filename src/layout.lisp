@@ -119,7 +119,7 @@
   (let ((class (char-class-of rs c)))
     (if (latin-class-p rs class)
         (make-glyph-box (glyph-advance font (code-char c) size) (string (code-char c))
-                        :source-start start :source-end end)
+                        :font font :source-start start :source-end end)
         (let* ((full (glyph-advance font (code-char c) size))
                (face (class-glyph-width rs class size))
                (slack (- full face))
@@ -128,7 +128,7 @@
                          (:middle (- (/ slack 2)))
                          (t 0))))
           (make-glyph-box face (string (code-char c))
-                          :glyph-offset offset
+                          :glyph-offset offset :font font
                           :source-start start :source-end end)))))
 
 (defun kanji-code-p (code)
@@ -151,11 +151,13 @@
          (rasc     (font-ascent* font rsize))
          (ruby-adv (loop for ch across ruby-string
                          sum (glyph-advance font ch rsize)))
-         (per-side (min (/ (max 0 (- ruby-adv base-adv)) 2) rsize)))
-    (ruby-mono base-adv asc (- size asc) (string base-ch) size
-               ruby-adv ruby-string rsize rasc :gap gap
-               :overhang-left  (if overhang-left-p  per-side 0)
-               :overhang-right (if overhang-right-p per-side 0))))
+         (per-side (min (/ (max 0 (- ruby-adv base-adv)) 2) rsize))
+         (box (ruby-mono base-adv asc (- size asc) (string base-ch) size
+                         ruby-adv ruby-string rsize rasc :gap gap
+                         :overhang-left  (if overhang-left-p  per-side 0)
+                         :overhang-right (if overhang-right-p per-side 0))))
+    (setf (ruby-font box) font)
+    box))
 
 (defun group-ruby-box (font size base-string ruby-string &key (gap 0))
   "グループルビ: 親文字列 BASE-STRING 全体に1つのルビ文字列 RUBY-STRING を均等配置。
@@ -165,8 +167,10 @@
          (rasc  (font-ascent* font rsize)))
     (flet ((chars  (s) (map 'list #'string s))
            (widths (s sz) (map 'list (lambda (ch) (glyph-advance font ch sz)) s)))
-      (ruby-group (chars base-string) (widths base-string size) size asc (- size asc)
-                  (chars ruby-string) (widths ruby-string rsize) rsize rasc :gap gap))))
+      (let ((box (ruby-group (chars base-string) (widths base-string size) size asc (- size asc)
+                             (chars ruby-string) (widths ruby-string rsize) rsize rasc :gap gap)))
+        (setf (ruby-font box) font)
+        box))))
 
 (defun jukugo-ruby-box (font size base-string ruby-parts &key (gap 0))
   "熟語ルビ (JLReq §3.3.7 / 付録F)。BASE-STRING の各字に RUBY-PARTS (文字列の list、
@@ -178,10 +182,12 @@
          (rsize (/ size 2))
          (rasc  (font-ascent* font rsize)))
     (flet ((cw (ch sz) (cons (string ch) (glyph-advance font ch sz))))
-      (ruby-jukugo (map 'list (lambda (ch) (cw ch size)) base-string)
-                   (mapcar (lambda (part) (map 'list (lambda (ch) (cw ch rsize)) part))
-                           ruby-parts)
-                   size asc (- size asc) rsize rasc :gap gap))))
+      (let ((box (ruby-jukugo (map 'list (lambda (ch) (cw ch size)) base-string)
+                              (mapcar (lambda (part) (map 'list (lambda (ch) (cw ch rsize)) part))
+                                      ruby-parts)
+                              size asc (- size asc) rsize rasc :gap gap)))
+        (setf (ruby-font box) font)
+        box))))
 
 (defun text-items (codes font size &key (kinsoku t) (ruleset (default-ruleset)))
   "コードポイント列を item 列にする。source-start/end も埋める (逆写像)。
@@ -273,14 +279,15 @@
                   for item = (aref line-items k)
                   do (cond
                        ((typep item 'ruby-box)
-                        ;; ルビ箱: 配置済みグリフ (親+ルビ) を box 左端 x ぶんずらして撒く
+                        ;; ルビ箱: 配置済みグリフ (親+ルビ) を box 左端 x ぶんずらし、箱の font で撒く
                         (dolist (p (ruby-placements item))
-                          (push (make-placed (+ x (placed-x p)) (placed-y p)
-                                             (placed-size p) (placed-string p))
+                          (push (make-line-glyph (+ x (placed-x p)) (placed-y p)
+                                                 (placed-size p) (ruby-font item) (placed-string p))
                                 glyphs)))
                        ((typep item 'glyph-box)
-                        ;; 通常グリフは y=0・行サイズ。描画位置は box 左端 + 字面オフセット
-                        (push (make-placed (+ x (glyph-offset item)) 0 size (box-glyphs item))
+                        ;; 通常グリフは y=0・行サイズ・box の font。描画位置は box 左端 + 字面オフセット
+                        (push (make-line-glyph (+ x (glyph-offset item)) 0 size
+                                               (box-font item) (box-glyphs item))
                               glyphs))
                        ((and (typep item 'glue) (plusp (aref sizes k)))
                         (push (cons x (aref sizes k)) gaps)))

@@ -17,6 +17,7 @@
            #:distribute-even #:kanji-code-p
            #:ruby-suppress-overhang #:ruby-oh-left #:ruby-oh-right
            #:make-placed #:placed-x #:placed-y #:placed-size #:placed-string
+           #:make-line-glyph #:lg-x #:lg-y #:lg-size #:lg-font #:lg-string
            #:glue #:stretch #:shrink #:stretch-order #:shrink-order
            #:stretch-priority #:shrink-priority #:glue-ratio
            #:penalty #:penalty-value #:flagged-p
@@ -122,6 +123,16 @@
 (defun placed-size (g) (third g))
 (defun placed-string (g) (fourth g))
 
+;;; laid-line の出力グリフ = placed に font を足した形 (x y size font . 文字列)。
+;;; placed は box 内の幾何 (font 非依存) で、こちらは行に撒いた最終出力。バックエンドは
+;;; font ごとに set-font して描く。font はバックエンドが解する不透明値 (cl-pdf の font 等)。
+(defun make-line-glyph (x y size font string) (list x y size font string))
+(defun lg-x (g)      (first g))
+(defun lg-y (g)      (second g))
+(defun lg-size (g)   (third g))
+(defun lg-font (g)   (fourth g))
+(defun lg-string (g) (fifth g))
+
 ;;; ---------------------------------------------------------------------------
 ;;; ruby-box -- 親文字の上にルビが乗った単位。ストリーム内では atomic な box。
 ;;; ---------------------------------------------------------------------------
@@ -139,7 +150,9 @@
    (oh-left  :initarg :oh-left  :initform 0 :accessor ruby-oh-left)
    (oh-right :initarg :oh-right :initform 0 :accessor ruby-oh-right)
    (base-adv :initarg :base-adv :initform 0 :accessor ruby-base-adv)
-   (ruby-adv :initarg :ruby-adv :initform 0 :accessor ruby-ruby-adv)))
+   (ruby-adv :initarg :ruby-adv :initform 0 :accessor ruby-ruby-adv)
+   ;; この箱の親・ルビを描くフォント (バックエンドが解する不透明値)。
+   (font :initarg :font :initform nil :accessor ruby-font)))
 
 (defun %ruby-place (base-adv ruby-adv oh-left oh-right)
   "ルビの水平配置。(values 箱advance 親x ルビx) を返す。
@@ -187,7 +200,7 @@
         (%ruby-place (ruby-base-adv rb) (ruby-ruby-adv rb) ol or*)
       (make-instance 'ruby-box
                      :advance adv :ascent (ascent rb) :descent (descent rb)
-                     :oh-left ol :oh-right or*
+                     :oh-left ol :oh-right or* :font (ruby-font rb)
                      :base-adv (ruby-base-adv rb) :ruby-adv (ruby-ruby-adv rb)
                      :placements (list (make-placed base-x (placed-y bp) (placed-size bp) (placed-string bp))
                                        (make-placed ruby-x (placed-y rp) (placed-size rp) (placed-string rp)))))))

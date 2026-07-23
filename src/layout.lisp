@@ -220,6 +220,26 @@
   (ratio 0)
   (status :exact))
 
+(defun adjust-line-boundaries (line-items)
+  "行 (item vector) の先頭/末尾が overhang 付き ruby-box なら、行境界側の overhang を消す。
+   行頭では左の食い込み先が無く、行末では右の食い込み先が無い (隣は別行/版面外) から。
+   luatexja の『単独=箱ルビ幅』(Case C) を行分割後に適用する形。非破壊で新 vector を返す。"
+  (let* ((n (length line-items))
+         (first (and (plusp n) (aref line-items 0)))
+         (last  (and (plusp n) (aref line-items (1- n))))
+         (fix-first (and (typep first 'ruby-box) (plusp (ruby-oh-left first))))
+         (fix-last  (and (typep last  'ruby-box) (plusp (ruby-oh-right last)))))
+    (if (or fix-first fix-last)
+        (let ((v (copy-seq line-items)))
+          (if (and fix-first fix-last (= n 1))
+              ;; 1字だけの行に両側 overhang: 両方消す
+              (setf (aref v 0) (ruby-suppress-overhang first :left t :right t))
+              (progn
+                (when fix-first (setf (aref v 0)      (ruby-suppress-overhang first :left t)))
+                (when fix-last  (setf (aref v (1- n)) (ruby-suppress-overhang last  :right t)))))
+          v)
+        line-items)))
+
 (defun layout-items (items line-width size &key (params (make-break-params)))
   "組み上がった item 列 (ruby-box を含んでよい) を行に割り付ける。
    SIZE は通常グリフの描画サイズ (ルビは自分の placements にサイズを持つ)。
@@ -229,12 +249,13 @@
          (start 0)
          (lines '()))
     (dolist (br breaks)
-      (let ((b (getf br :position)))
-        (multiple-value-bind (sizes status) (set-glue items line-width :start start :end b)
+      (let* ((b (getf br :position))
+             ;; 行の中身を切り出し、境界の ruby-box の overhang を抑制してから組む
+             (line-items (adjust-line-boundaries (subseq items start b))))
+        (multiple-value-bind (sizes status) (set-glue line-items line-width)
           (let ((x 0) (glyphs '()) (gaps '()))
-            (loop for i from start below b
-                  for k from 0
-                  for item = (aref items i)
+            (loop for k from 0 below (length line-items)
+                  for item = (aref line-items k)
                   do (cond
                        ((typep item 'ruby-box)
                         ;; ルビ箱: 配置済みグリフ (親+ルビ) を box 左端 x ぶんずらして撒く

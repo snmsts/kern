@@ -121,7 +121,11 @@ kern の実装 (probe & 視覚とも luatexja 一致):
 - itemization (`ruby-demo-items`) が **隣の先頭コードが漢字か** (`kanji-code-p`, Unicode 範囲) で
   可否を決める。仮名隣=食込、漢字/無し=食込まず。
 
-**未了 (正直に)**: 行頭行末の overhang 抑制。ruby-box が行境界に落ちると隣は別行なので
-本来 overhang できないが、現状は「stream 上の隣接ユニット」で判定するため境界を見ていない。
-= luatexja の Case C 相当を行分割後に適用する必要がある。行分割との相互作用が残る難所。
-mid-line の overhang は正しく効く。
+**行境界の overhang 抑制 (解決, 2026-07-23)**: ruby-box が行頭/行末に落ちると隣は別行/版面外
+なので overhang できない (luatexja の Case C = 箱ルビ幅)。行分割の後、各行の先頭が oh-left>0 の
+ruby-box なら左を、末尾が oh-right>0 なら右を消す。`ruby-suppress-overhang` (箱を作り直す) と
+`adjust-line-boundaries` (layout-items が各行で適用)。%ruby-place に配置計算を集約し両者で共有。
+- probe: 都(みやこ) を単独行に落とすと箱が 15 (ルビ幅) に広がり、みやこ が x=0 (版面外へ出ない)。
+- mid-line (同一行の の都に) では 都 は行の先頭/末尾でないので抑制されず、食い込みは保たれる。
+- 行分割との相互作用: 行分割は mid-line の advance (親幅) で切り、その後に境界だけ作り直す
+  = 破壊的な再分割は不要。widen で行が僅かに変わるが set-glue が吸収する。

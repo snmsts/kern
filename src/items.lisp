@@ -14,6 +14,7 @@
            #:glyph-box #:box-font #:box-glyphs #:glyph-offset
            #:ruby-box #:ruby-placements #:ruby-mono #:mono-ruby-box
            #:ruby-group #:group-ruby-box #:distribute-even #:kanji-code-p
+           #:ruby-suppress-overhang #:ruby-oh-left #:ruby-oh-right
            #:make-placed #:placed-x #:placed-y #:placed-size #:placed-string
            #:glue #:stretch #:shrink #:stretch-order #:shrink-order
            #:stretch-priority #:shrink-priority #:glue-ratio
@@ -130,7 +131,22 @@
 ;;;   描画バックエンドはこの並びを歩いて、各 x に size で文字列を置くだけ。
 
 (defclass ruby-box (box)
-  ((placements :initarg :placements :initform nil :accessor ruby-placements)))
+  ((placements :initarg :placements :initform nil :accessor ruby-placements)
+   ;; 行境界での overhang 抑制に要る情報。oh-left/right = 各側の食い込み量、
+   ;; base-adv/ruby-adv = 素の親幅・ルビ幅 (作り直しに使う)。ルビ<=親なら oh は 0。
+   (oh-left  :initarg :oh-left  :initform 0 :accessor ruby-oh-left)
+   (oh-right :initarg :oh-right :initform 0 :accessor ruby-oh-right)
+   (base-adv :initarg :base-adv :initform 0 :accessor ruby-base-adv)
+   (ruby-adv :initarg :ruby-adv :initform 0 :accessor ruby-ruby-adv)))
+
+(defun %ruby-place (base-adv ruby-adv oh-left oh-right)
+  "ルビの水平配置。(values 箱advance 親x ルビx) を返す。
+   ルビ<=親: 箱=親幅・親x=0・ルビ中央。
+   ルビ>親: 箱=ルビ幅−食込左−食込右 (親幅が下限)・親中央・ルビは −食込左 から。"
+  (if (> ruby-adv base-adv)
+      (let ((adv (max base-adv (- ruby-adv oh-left oh-right))))
+        (values adv (/ (- adv base-adv) 2) (- oh-left)))
+      (values base-adv 0 (/ (- base-adv ruby-adv) 2))))
 
 (defun ruby-mono (base-advance base-ascent base-descent base-string base-size
                   ruby-advance ruby-string ruby-size ruby-ascent
@@ -147,19 +163,32 @@
   (let* ((ruby-descent (- ruby-size ruby-ascent))
          (rise         (+ base-ascent ruby-descent gap))
          (over         (> ruby-advance base-advance))
-         (adv          (if over
-                           (max base-advance (- ruby-advance overhang-left overhang-right))
-                           base-advance))
-         (base-x       (/ (- adv base-advance) 2))
-         (ruby-x       (if over
-                           (- overhang-left)
-                           (/ (- adv ruby-advance) 2))))
-    (make-instance 'ruby-box
-                   :advance adv
-                   :ascent  (+ rise ruby-ascent)
-                   :descent base-descent
-                   :placements (list (make-placed base-x 0    base-size base-string)
-                                     (make-placed ruby-x rise ruby-size ruby-string)))))
+         (ol           (if over overhang-left 0))
+         (or*          (if over overhang-right 0)))
+    (multiple-value-bind (adv base-x ruby-x)
+        (%ruby-place base-advance ruby-advance ol or*)
+      (make-instance 'ruby-box
+                     :advance adv :ascent (+ rise ruby-ascent) :descent base-descent
+                     :oh-left ol :oh-right or* :base-adv base-advance :ruby-adv ruby-advance
+                     :placements (list (make-placed base-x 0    base-size base-string)
+                                       (make-placed ruby-x rise ruby-size ruby-string))))))
+
+(defun ruby-suppress-overhang (rb &key left right)
+  "行境界に落ちた ruby-box の、境界側の overhang を消した新しい ruby-box を返す。
+   LEFT が真なら左の食い込みを 0 に、RIGHT が真なら右を 0 に。箱がその分広がり、
+   親・ルビの水平位置を計算し直す (y/サイズ/文字列は不変)。luatexja の Case C 相当。"
+  (let* ((ol (if left  0 (ruby-oh-left rb)))
+         (or* (if right 0 (ruby-oh-right rb)))
+         (bp (first  (ruby-placements rb)))
+         (rp (second (ruby-placements rb))))
+    (multiple-value-bind (adv base-x ruby-x)
+        (%ruby-place (ruby-base-adv rb) (ruby-ruby-adv rb) ol or*)
+      (make-instance 'ruby-box
+                     :advance adv :ascent (ascent rb) :descent (descent rb)
+                     :oh-left ol :oh-right or*
+                     :base-adv (ruby-base-adv rb) :ruby-adv (ruby-ruby-adv rb)
+                     :placements (list (make-placed base-x (placed-y bp) (placed-size bp) (placed-string bp))
+                                       (make-placed ruby-x (placed-y rp) (placed-size rp) (placed-string rp)))))))
 
 (defun ruby-group (base-strings base-widths base-size base-ascent base-descent
                    ruby-strings ruby-widths ruby-size ruby-ascent &key (gap 0))

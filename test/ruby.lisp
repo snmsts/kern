@@ -108,8 +108,30 @@
   (la-check (not (kanji-code-p #x306E))   "の は仮名 (非漢字)")
   (la-check (not (kanji-code-p #x30C6))   "テ は仮名 (非漢字)"))
 
+(defun test-ruby-boundary-suppress ()
+  ;; 行境界に落ちた overhang ruby-box の抑制 (都10/みやこ15, 両側食込2.5)。
+  (let ((rb (ruby-mono 10 44/5 6/5 "都" 10 15 "みやこ" 5 22/5
+                       :overhang-left 5/2 :overhang-right 5/2)))
+    (la-check= (advance rb) 10 "mid-line: 箱=親幅10")
+    (let ((l (ruby-suppress-overhang rb :left t)))
+      (la-check= (advance l) 25/2 "左抑制: 箱12.5 (10+2.5)")
+      (la-check= (placed-x (second (ruby-placements l))) 0 "左抑制: ルビ x=0 (はみ出さない)"))
+    (let ((both (ruby-suppress-overhang rb :left t :right t)))
+      (la-check= (advance both) 15  "両側抑制: 箱=ルビ幅15 (Case C)")
+      (la-check= (placed-x (first (ruby-placements both))) 5/2 "両側抑制: 親中央2.5")))
+  ;; adjust-line-boundaries: 単独行 (n=1) の overhang ruby は両側抑制。
+  (let* ((rb (ruby-mono 10 44/5 6/5 "都" 10 15 "みやこ" 5 22/5
+                        :overhang-left 5/2 :overhang-right 5/2))
+         (adj (adjust-line-boundaries (vector rb))))
+    (la-check= (advance (aref adj 0)) 15 "単独行: 両側抑制→箱15"))
+  ;; 行頭が overhang ruby、後ろに box: 左だけ抑制 (右はまだ隣がある)。
+  (let* ((rb (ruby-mono 10 44/5 6/5 "都" 10 15 "みやこ" 5 22/5
+                        :overhang-left 5/2 :overhang-right 5/2))
+         (adj (adjust-line-boundaries (vector rb (make-box 10)))))
+    (la-check= (advance (aref adj 0)) 25/2 "行頭ruby: 左だけ抑制→箱12.5")))
+
 (defun run-ruby-tests ()
-  "ルビ (モノ + グループ + overhang) の回帰テスト。全通過なら T。"
+  "ルビ (モノ + グループ + overhang + 境界抑制) の回帰テスト。全通過なら T。"
   (setf *la-checks* 0 *la-fails* 0)
   (test-ruby-mono-shorter)
   (test-ruby-mono-longer)
@@ -118,6 +140,7 @@
   (test-distribute-even)
   (test-ruby-group)
   (test-ruby-overhang)
+  (test-ruby-boundary-suppress)
   (format t "~&ruby (mono, no-overhang): ~a/~a checks passed~a~%"
           (- *la-checks* *la-fails*) *la-checks*
           (if (zerop *la-fails*) "  OK" "  *** FAIL ***"))

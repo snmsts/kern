@@ -33,28 +33,40 @@
 
 ;;; --- 描画協定の実装 ---
 
-(defun draw-lines (lines font size &key (x 60) (y 760) (line-pitch (* size 17/10)))
-  "LAID-LINE の並びを現在のページに描く。
+(defun draw-lines (lines font size &key (x 60) (y 760) (line-pitch (* size 17/10))
+                                        (direction :horizontal))
+  "LAID-LINE の並びを現在のページに描く。DIRECTION は :horizontal か :vertical。
 
-   ★グリフごとの位置決めに Td (cl-pdf の move-text) を使う。
-     Td は【直前の行頭からの相対】なので、隣り合うグリフの x の差を渡せばよい。
-     Tj による送りは行列を動かさないので干渉しない。
-     cl-pdf 自身も text.lisp:47 で同じ手を使っている。"
-  (loop for line in lines
-        for i from 0
-        do (pdf:in-text-mode
-             (pdf:move-text x (- y (* i line-pitch)))
-             ;; グリフごとに (x y size 文字列)。ルビは y>0・小サイズなので、
-             ;; サイズが変わったら set-font し直し、ベースラインを y ぶん上げる。
-             (let ((last-x 0) (last-y 0) (cur-size nil))
-               (dolist (g (line-glyphs line))
-                 (let ((gx (placed-x g)) (gy (placed-y g)) (gsize (placed-size g)))
-                   (unless (eql gsize cur-size)
-                     (pdf:set-font font gsize)
-                     (setf cur-size gsize))
-                   (pdf:move-text (float (- gx last-x)) (float (- gy last-y)))
-                   (pdf:draw-text (placed-string g))
-                   (setf last-x gx last-y gy)))))))
+   ★placed グリフは (advance-pos . cross-offset) = (書字方向の位置 . 直交方向のずれ)。
+     LAID-LINE は方向中立で、ここで画面座標へ写像する:
+       横組み: 画面 = 行原点 + (advance,  cross)    行は下へ (y − i·pitch)
+       縦組み: 画面 = 列原点 + (cross,  −advance)   列は右→左 (x − i·pitch)
+     縦組みでは advance が下向き、cross (ルビ等) が右向き。
+   ★グリフごとの位置決めに Td (cl-pdf の move-text)。Td は行頭からの相対なので
+     隣り合うグリフの画面座標の差を渡す。Tj の送りは行列を動かさず干渉しない。"
+  (flet ((line-origin (i)
+           (ecase direction
+             (:horizontal (values x (- y (* i line-pitch))))
+             (:vertical   (values (- x (* i line-pitch)) y))))
+         (glyph-xy (a c)                ; a=advance-pos, c=cross-offset → 行原点からの画面 offset
+           (ecase direction
+             (:horizontal (values a c))
+             (:vertical   (values c (- a))))))
+    (loop for line in lines
+          for i from 0
+          do (multiple-value-bind (ox oy) (line-origin i)
+               (pdf:in-text-mode
+                 (pdf:move-text ox oy)
+                 (let ((last-x 0) (last-y 0) (cur-size nil))
+                   (dolist (g (line-glyphs line))
+                     (multiple-value-bind (gx gy) (glyph-xy (placed-x g) (placed-y g))
+                       (let ((gsize (placed-size g)))
+                         (unless (eql gsize cur-size)
+                           (pdf:set-font font gsize)
+                           (setf cur-size gsize))
+                         (pdf:move-text (float (- gx last-x)) (float (- gy last-y)))
+                         (pdf:draw-text (placed-string g))
+                         (setf last-x gx last-y gy))))))))))
 
 ;;; --- フォントのサブセット化を cl-pdf に差し込む ---
 

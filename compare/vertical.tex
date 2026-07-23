@@ -1,0 +1,20 @@
+% vertical.tex -- luatexja の縦組みを実測 (縦書きの設計 ground truth)
+% 約物 (句読点・括弧) と数字 (縦中横候補) を含む縦組み。
+%   docker run --rm -v "$(pwd -W):/work" -w /work/compare texlive/texlive \
+%     lualatex -interaction=nonstopmode vertical.tex
+
+\documentclass[tate,fontsize=12pt,paper=a6]{jlreq}
+\usepackage{luatexja-ruby}
+\showboxdepth=8
+\showboxbreadth=200
+
+\begin{document}
+
+% 目視用の縦組み本文 (約物・ルビ・数字)
+吾輩は猫である。名前はまだ無い。「どこで生れたか」と\ruby{今}{いま}も思う。
+
+% 構造を見るための一行ダンプ (縦組みなので direction は TRT になるはず)
+\setbox0=\hbox{日本語、「組版」。}
+\showbox0
+
+\end{document}

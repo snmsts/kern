@@ -13,7 +13,8 @@
            #:box #:ascent #:descent #:protrusion
            #:glyph-box #:box-font #:box-glyphs #:glyph-offset
            #:ruby-box #:ruby-placements #:ruby-mono #:mono-ruby-box
-           #:ruby-group #:group-ruby-box #:jukugo-ruby-box #:distribute-even #:kanji-code-p
+           #:ruby-group #:group-ruby-box #:jukugo-ruby-box #:ruby-jukugo
+           #:distribute-even #:kanji-code-p
            #:ruby-suppress-overhang #:ruby-oh-left #:ruby-oh-right
            #:make-placed #:placed-x #:placed-y #:placed-size #:placed-string
            #:glue #:stretch #:shrink #:stretch-order #:shrink-order
@@ -213,6 +214,38 @@
                    :ascent  (+ rise ruby-ascent)
                    :descent base-descent
                    :placements (nreverse placements))))
+
+(defun ruby-jukugo (base ruby-parts base-size base-ascent base-descent
+                    ruby-size ruby-ascent &key (gap 0))
+  "熟語ルビ (JLReq §3.3.7 / 付録F)。BASE = 親の ((文字列 . 幅) ...)、
+   RUBY-PARTS = 親字ごとのルビの ((文字列 . 幅) ...) の list。
+   ★2モード (luatexja 実測): 全ルビが自分の親字に収まるなら各ルビを親字上に中央配置
+     (モノ的、名前/なまえ)。はみ出す親字があれば全体を平坦化し均等配置で融通 (二十/にじゅう)。"
+  (let* ((base-widths  (mapcar #'cdr base))
+         (part-widths  (mapcar (lambda (p) (reduce #'+ p :key #'cdr :initial-value 0)) ruby-parts))
+         (all-fit      (every (lambda (rw bw) (<= rw bw)) part-widths base-widths))
+         (ruby-descent (- ruby-size ruby-ascent))
+         (rise         (+ base-ascent ruby-descent gap)))
+    (if all-fit
+        ;; モード A: 親は連続、各ルビは自分の親字上に中央。
+        (let ((bx 0) (placements '()))
+          (loop for (bstr . bw) in base
+                for part in ruby-parts
+                for pw in part-widths
+                do (push (make-placed bx 0 base-size bstr) placements)
+                   (let ((rx (+ bx (/ (- bw pw) 2))))
+                     (loop for (rstr . rw) in part
+                           do (push (make-placed rx rise ruby-size rstr) placements)
+                              (incf rx rw)))
+                   (incf bx bw))
+          (make-instance 'ruby-box :advance (reduce #'+ base-widths :initial-value 0)
+                         :ascent (+ rise ruby-ascent) :descent base-descent
+                         :placements (nreverse placements)))
+        ;; モード B: 平坦化 = 連結ルビを親全体へ均等配置 (group と同じ機構)。
+        (let ((ruby-flat (loop for p in ruby-parts append p)))
+          (ruby-group (mapcar #'car base) base-widths base-size base-ascent base-descent
+                      (mapcar #'car ruby-flat) (mapcar #'cdr ruby-flat)
+                      ruby-size ruby-ascent :gap gap)))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; glue -- 伸縮する空き。均等割りの担い手。

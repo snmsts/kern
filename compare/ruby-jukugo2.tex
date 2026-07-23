@@ -1,0 +1,11 @@
+% ruby-jukugo2.tex -- 余りのある熟語ルビ。境界のアキ重み付けを実測。
+% 名|前 / な|まえ: な=5<名10, まえ=10=前10。合計ルビ15 < 親20, 余り5。
+% 余り5を | 境界と群内でどう配分するか (境界の方が広いはず)。
+\documentclass[fontsize=10pt]{jlreq}
+\usepackage{luatexja-ruby}
+\showboxdepth=10
+\showboxbreadth=1000
+\begin{document}
+\setbox0=\hbox{\ruby{名|前}{な|まえ}}
+\showbox0
+\end{document}

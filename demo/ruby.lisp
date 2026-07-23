@@ -93,9 +93,13 @@
         ;; 隣が漢字(京/府)=食い込まない (except-kanji) → 箱がルビ幅に広がる
         #x4EAC (list #x90FD #x307F #x3084 #x3053) #x5E9C  ; 京 都(みやこ) 府
         #x3000                        ; 全角スペース
-        ;; 熟語ルビ 二(に)十(じゅう): に<二・じゅう>十 だが熟語内で釣り合う
+        ;; 熟語B 二(に)十(じゅう): じゅう>十 だが熟語内で融通・平坦化して釣り合う
         (list :jukugo (list #x4E8C #x5341)
-              (list (list #x306B) (list #x3058 #x3085 #x3046)))))
+              (list (list #x306B) (list #x3058 #x3085 #x3046)))
+        #x3000                        ; 全角スペース
+        ;; 熟語A 名(な)前(まえ): どちらも親に収まる → 各ルビを親字上に個別中央
+        (list :jukugo (list #x540D #x524D)
+              (list (list #x306A) (list #x307E #x3048)))))
 
 (defun run-ruby-pdf (&key (size 24) (units *ruby-sample*))
   "ルビ付きの1行を組んで PDF に描く。"

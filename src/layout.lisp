@@ -170,16 +170,18 @@
 
 (defun jukugo-ruby-box (font size base-string ruby-parts &key (gap 0))
   "熟語ルビ (JLReq §3.3.7 / 付録F)。BASE-STRING の各字に RUBY-PARTS (文字列の list、
-   1字につき1ルビ) を対応させる。二(に)十(じゅう) のように、片方のルビが親より長くても
-   熟語内で余りを融通し合い、はみ出さずに全体で釣り合わせる。
-
-   ★第一近似: 連結したルビ列全体を親全体に均等配置する (= ruby-group)。釣り合った熟語
-     (合計ルビ幅 ≒ 合計親幅) の幾何は luatexja と一致 (compare/ruby-jukugo box0 で実測)。
-   ★未実装 (真の難所): (1) 熟語内での行分割 (二|十 で切り各字が自分のルビを連れて行く)、
-     (2) 群境界のアキ重み付け (ルビ<親で余る時、| 境界を群内より広く空ける)。
-     現状は境界を無視した一様均等なので、余りが大きい熟語では luatexja とずれる。"
-  (group-ruby-box font size base-string
-                  (apply #'concatenate 'string ruby-parts) :gap gap))
+   1字につき1ルビ) を対応させる。フォント計測を引き受けて ruby-jukugo に渡す。
+   2モード (luatexja 実測): 全ルビが自分の親字に収まれば各ルビを親字上に中央 (名前/なまえ)、
+   はみ出す親字があれば全体を平坦化し融通 (二十/にじゅう)。
+   ★未実装 (真の難所): 熟語内での行分割 (二|十 で切り各字がルビを連れて別行へ)。"
+  (let* ((asc   (font-ascent* font size))
+         (rsize (/ size 2))
+         (rasc  (font-ascent* font rsize)))
+    (flet ((cw (ch sz) (cons (string ch) (glyph-advance font ch sz))))
+      (ruby-jukugo (map 'list (lambda (ch) (cw ch size)) base-string)
+                   (mapcar (lambda (part) (map 'list (lambda (ch) (cw ch rsize)) part))
+                           ruby-parts)
+                   size asc (- size asc) rsize rasc :gap gap))))
 
 (defun text-items (codes font size &key (kinsoku t) (ruleset (default-ruleset)))
   "コードポイント列を item 列にする。source-start/end も埋める (逆写像)。

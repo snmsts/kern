@@ -131,19 +131,28 @@
     (la-check= (advance (aref adj 0)) 25/2 "行頭ruby: 左だけ抑制→箱12.5")))
 
 (defun test-ruby-jukugo ()
-  ;; 熟語ルビ 二十/にじゅう (合計20=20)。に(5<二10) じゅう(15>十10) だが熟語内で融通し、
-  ;; 合計で釣り合って連続配置。独立モノなら じゅう が15幅にはみ出すところ。
-  ;; luatexja box0 (compare/ruby-jukugo) と一致。第一近似 = 連結の group ruby。
-  (let ((rb (ruby-group (list "二" "十") (list 10 10) 10 44/5 6/5
-                        (list "に" "じ" "ゅ" "う") (list 5 5 5 5) 5 22/5)))
-    (la-check= (advance rb) 20 "熟語: 箱=親合計20 (じゅうがはみ出さない)")
+  ;; モードA (全ルビが自分の親字に収まる): 名前/なまえ。各ルビを親字上に中央 (luatexja 実測)。
+  (let ((rb (ruby-jukugo (list (cons "名" 10) (cons "前" 10))
+                         (list (list (cons "な" 5)) (list (cons "ま" 5) (cons "え" 5)))
+                         10 44/5 6/5 5 22/5)))
+    (la-check= (advance rb) 20 "熟語A: 箱=親合計20")
+    (destructuring-bind (b1 r1 b2 r2 r3) (ruby-placements rb)
+      (la-check= (placed-x b1) 0   "名=0")
+      (la-check= (placed-x r1) 5/2 "な 中央2.5 (名の上)")
+      (la-check= (placed-x b2) 10  "前=10")
+      (la-check= (placed-x r2) 10  "ま=10 (前の上, 連続)")
+      (la-check= (placed-x r3) 15  "え=15")))
+  ;; モードB (はみ出す親字あり): 二十/にじゅう。全体平坦化で融通、じゅうがはみ出さない。
+  ;; luatexja box0 (compare/ruby-jukugo) と一致。独立モノなら じゅう が15幅にはみ出す。
+  (let ((rb (ruby-jukugo (list (cons "二" 10) (cons "十" 10))
+                         (list (list (cons "に" 5))
+                               (list (cons "じ" 5) (cons "ゅ" 5) (cons "う" 5)))
+                         10 44/5 6/5 5 22/5)))
+    (la-check= (advance rb) 20 "熟語B: 箱20 (じゅうがはみ出さない)")
     (destructuring-bind (b1 b2 r1 r2 r3 r4) (ruby-placements rb)
-      (la-check= (placed-x b1) 0  "親 二=0")
-      (la-check= (placed-x b2) 10 "親 十=10")
-      (la-check= (placed-x r1) 0  "ルビ に=0")
-      (la-check= (placed-x r2) 5  "ルビ じ=5")
-      (la-check= (placed-x r3) 10 "ルビ ゅ=10")
-      (la-check= (placed-x r4) 15 "ルビ う=15 (連続, luatexja box0 と一致)"))))
+      (la-check= (placed-x b1) 0  "二=0")   (la-check= (placed-x b2) 10 "十=10")
+      (la-check= (placed-x r1) 0  "に=0")   (la-check= (placed-x r2) 5  "じ=5")
+      (la-check= (placed-x r3) 10 "ゅ=10")  (la-check= (placed-x r4) 15 "う=15 (連続, box0 一致)"))))
 
 (defun run-ruby-tests ()
   "ルビ (モノ + グループ + overhang + 境界抑制 + 熟語) の回帰テスト。全通過なら T。"

@@ -130,8 +130,23 @@
          (adj (adjust-line-boundaries (vector rb (make-box 10)))))
     (la-check= (advance (aref adj 0)) 25/2 "行頭ruby: 左だけ抑制→箱12.5")))
 
+(defun test-ruby-jukugo ()
+  ;; 熟語ルビ 二十/にじゅう (合計20=20)。に(5<二10) じゅう(15>十10) だが熟語内で融通し、
+  ;; 合計で釣り合って連続配置。独立モノなら じゅう が15幅にはみ出すところ。
+  ;; luatexja box0 (compare/ruby-jukugo) と一致。第一近似 = 連結の group ruby。
+  (let ((rb (ruby-group (list "二" "十") (list 10 10) 10 44/5 6/5
+                        (list "に" "じ" "ゅ" "う") (list 5 5 5 5) 5 22/5)))
+    (la-check= (advance rb) 20 "熟語: 箱=親合計20 (じゅうがはみ出さない)")
+    (destructuring-bind (b1 b2 r1 r2 r3 r4) (ruby-placements rb)
+      (la-check= (placed-x b1) 0  "親 二=0")
+      (la-check= (placed-x b2) 10 "親 十=10")
+      (la-check= (placed-x r1) 0  "ルビ に=0")
+      (la-check= (placed-x r2) 5  "ルビ じ=5")
+      (la-check= (placed-x r3) 10 "ルビ ゅ=10")
+      (la-check= (placed-x r4) 15 "ルビ う=15 (連続, luatexja box0 と一致)"))))
+
 (defun run-ruby-tests ()
-  "ルビ (モノ + グループ + overhang + 境界抑制) の回帰テスト。全通過なら T。"
+  "ルビ (モノ + グループ + overhang + 境界抑制 + 熟語) の回帰テスト。全通過なら T。"
   (setf *la-checks* 0 *la-fails* 0)
   (test-ruby-mono-shorter)
   (test-ruby-mono-longer)
@@ -141,6 +156,7 @@
   (test-ruby-group)
   (test-ruby-overhang)
   (test-ruby-boundary-suppress)
+  (test-ruby-jukugo)
   (format t "~&ruby (mono, no-overhang): ~a/~a checks passed~a~%"
           (- *la-checks* *la-fails*) *la-checks*
           (if (zerop *la-fails*) "  OK" "  *** FAIL ***"))

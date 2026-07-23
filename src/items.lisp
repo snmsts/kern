@@ -13,7 +13,7 @@
            #:box #:ascent #:descent #:protrusion
            #:glyph-box #:box-font #:box-glyphs #:glyph-offset
            #:ruby-box #:ruby-placements #:ruby-mono #:mono-ruby-box
-           #:ruby-group #:group-ruby-box #:distribute-even #:kanji-code-p
+           #:ruby-group #:group-ruby-box #:jukugo-ruby-box #:distribute-even #:kanji-code-p
            #:ruby-suppress-overhang #:ruby-oh-left #:ruby-oh-right
            #:make-placed #:placed-x #:placed-y #:placed-size #:placed-string
            #:glue #:stretch #:shrink #:stretch-order #:shrink-order

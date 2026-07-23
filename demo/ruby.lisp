@@ -11,7 +11,7 @@
 (defun unit-lead-code (u)
   "UNIT の先頭の親コードポイント (overhang の except-kanji 判定に使う)。"
   (cond ((integerp u) u)
-        ((eq (first u) :group) (first (second u)))
+        ((and (consp u) (member (first u) '(:group :jukugo))) (first (second u)))
         (t (first u))))
 
 (defun ruby-demo-items (font size units)
@@ -35,6 +35,13 @@
                (values (group-ruby-box font size
                                        (map 'string #'code-char (second u))
                                        (map 'string #'code-char (third u)))
+                       (first (second u))))
+              ((eq (first u) :jukugo)
+               ;; (:jukugo (親コード列) (親字ごとのルビコード列 の list))
+               (values (jukugo-ruby-box font size
+                                        (map 'string #'code-char (second u))
+                                        (mapcar (lambda (cs) (map 'string #'code-char cs))
+                                                (third u)))
                        (first (second u))))
               (t (let* ((lc (when (> i 0)        (unit-lead-code (aref vec (1- i)))))
                         (rc (when (< (1+ i) n)   (unit-lead-code (aref vec (1+ i))))))
@@ -60,6 +67,9 @@
         ((eq (first u) :group)
          (dolist (c (second u)) (push c codes))
          (dolist (c (third u))  (push c codes)))
+        ((eq (first u) :jukugo)
+         (dolist (c (second u)) (push c codes))
+         (dolist (cs (third u)) (dolist (c cs) (push c codes))))
         (t (push (first u) codes)
            (dolist (r (rest u)) (push r codes)))))
     (coerce (nreverse codes) 'vector)))
@@ -81,14 +91,18 @@
         #x306E (list #x90FD #x307F #x3084 #x3053) #x306B  ; の 都(みやこ) に
         #x3000                        ; 全角スペース
         ;; 隣が漢字(京/府)=食い込まない (except-kanji) → 箱がルビ幅に広がる
-        #x4EAC (list #x90FD #x307F #x3084 #x3053) #x5E9C)) ; 京 都(みやこ) 府
+        #x4EAC (list #x90FD #x307F #x3084 #x3053) #x5E9C  ; 京 都(みやこ) 府
+        #x3000                        ; 全角スペース
+        ;; 熟語ルビ 二(に)十(じゅう): に<二・じゅう>十 だが熟語内で釣り合う
+        (list :jukugo (list #x4E8C #x5341)
+              (list (list #x306B) (list #x3058 #x3085 #x3046)))))
 
 (defun run-ruby-pdf (&key (size 24) (units *ruby-sample*))
   "ルビ付きの1行を組んで PDF に描く。"
   (let* ((fm    (pdf:load-ttf-font *ttf*))
          (font  (pdf:get-font (pdf::font-name fm)))
          (codes (ruby-demo-codes units))
-         (width (* size 22))
+         (width (* size 15))
          (items (coerce (finish-paragraph (ruby-demo-items font size units)) 'vector))
          (lines (layout-items items width size)))
     (format t "~&=== ルビ PDF デモ ===~%")

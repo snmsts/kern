@@ -1,0 +1,22 @@
+% ruby-jukugo.tex -- 熟語ルビ (JLReq §3.3.7 / 付録F) を luatexja から実測
+% 二(に)十(じゅう): に=5<二10 (短い), じゅう=15>十10 (長い), 合計 20=20。
+% 独立モノなら じゅう が十からはみ出す。熟語なら二の余りを融通して釣り合うはず。
+%   docker run --rm -v "$(pwd -W):/work" -w /work/compare texlive/texlive \
+%     lualatex -interaction=nonstopmode ruby-jukugo.tex
+
+\documentclass[fontsize=10pt]{jlreq}
+\usepackage{luatexja-ruby}
+\showboxdepth=10
+\showboxbreadth=1000
+
+\begin{document}
+
+% 熟語ルビ (| で各親字に対応、複数字 = jukugo 扱い)
+\setbox0=\hbox{\ruby{二|十}{に|じゅう}}
+\showbox0
+
+% 比較: 独立モノルビ2つ (別々に振る) — 二(に) 十(じゅう) を離して
+\setbox1=\hbox{\ruby{二}{に}\ruby{十}{じゅう}}
+\showbox1
+
+\end{document}

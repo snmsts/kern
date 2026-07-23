@@ -81,7 +81,7 @@ ros run -- --load load.lisp
 Tests need only the core — no cl-pdf, no fonts:
 
 ```lisp
-(asdf:test-system "kern")          ; 117 checks (§4.19, ruby, document)
+(asdf:test-system "kern")          ; 113 checks (§4.19, ruby, document)
 ```
 
 ## License

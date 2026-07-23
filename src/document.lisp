@@ -15,24 +15,35 @@
 
 (in-package #:kern)
 
+(defparameter *kenten-mark* "﹅"
+  "圏点 (強調の傍点)。JLReq の既定はゴマ点。各字の上 (縦組みでは右) に付く。")
+
 (defun %inline-atoms (content)
-  "インライン内容を atom の list へ平坦化。atom = 文字コード (通常字) or ruby 形 (そのまま)。"
+  "インライン内容を atom の list へ平坦化。
+   atom = 文字コード (通常字) / ruby 形 / (:kenten コード) (圏点付き1字)。
+   (:em \"強調\") は各字を圏点 atom へ展開する。"
   (let ((atoms '()))
     (dolist (node content)
-      (if (stringp node)
-          (loop for ch across node do (push (char-code ch) atoms))
-          (push node atoms)))
+      (cond
+        ((stringp node) (loop for ch across node do (push (char-code ch) atoms)))
+        ((eq (first node) :em)
+         (loop for ch across (second node) do (push (list :kenten (char-code ch)) atoms)))
+        (t (push node atoms))))
     (nreverse atoms)))
 
 (defun %atom-code (atom)
   "atom の先頭親コード (inter-glue のクラス・overhang の隣判定に使う)。"
-  (if (integerp atom) atom (char-code (char (second atom) 0))))
+  (cond ((integerp atom) atom)
+        ((eq (first atom) :kenten) (second atom))
+        (t (char-code (char (second atom) 0)))))
 
 (defun %atom->box (atom font size rs left-code right-code)
   "atom を box にする。ruby 形は隣コードから overhang 可否を決める (except-kanji)。"
   (if (integerp atom)
       (emit-char-box rs font size atom 0 0)
       (ecase (first atom)
+        (:kenten (mono-ruby-box font size (second atom) *kenten-mark*))  ; 圏点=点をルビに
+
         (:ruby   (if (> (length (second atom)) 1)
                      ;; 親が多字なら group 扱い (モノルビは親1字)。取りこぼし防止。
                      (group-ruby-box font size (second atom) (third atom))
@@ -122,6 +133,7 @@
                (if (stringp a)
                    (str a)
                    (ecase (first a)
+                     (:em     (str (second a)) (str *kenten-mark*))  ; 本文 + 圏点マーク
                      (:ruby   (str (second a)) (str (third a)))
                      (:group  (str (second a)) (str (third a)))
                      (:jukugo (str (second a)) (dolist (p (third a)) (str p)))))))

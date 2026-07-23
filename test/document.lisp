@@ -15,6 +15,15 @@
   ;; %atom-code: ruby 形の先頭は base の先頭字。
   (la-check= (%atom-code (list :ruby "猫" "ねこ")) (char-code #\猫) "ruby atom の code=base先頭")
   (la-check= (%atom-code 65) 65 "整数 atom はそのまま")
+  ;; :em → 各字を圏点 atom (:kenten code) へ展開。
+  (la-check (equal (%inline-atoms (list (list :em "強調")))
+                   (list (list :kenten (char-code #\強)) (list :kenten (char-code #\調))))
+            ":em → 各字 :kenten")
+  (la-check= (%atom-code (list :kenten (char-code #\強))) (char-code #\強) ":kenten atom の code")
+  (let ((doc (list :document (list :p (list :em "強")))))
+    (la-check (equal (coerce (document-codes doc) 'list)
+                     (list (char-code #\強) (char-code (char *kenten-mark* 0))))
+              ":em codes = 本文+圏点マーク"))
   ;; document-codes: 親+ルビの全コードを順に。
   (let ((doc '(:document (:size 12)
                (:p "あ" (:ruby "猫" "ねこ"))

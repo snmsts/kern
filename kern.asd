@@ -34,6 +34,7 @@
                              (:file "jfm")
                              (:file "uax14")
                              (:file "layout")
+                             (:file "document")
                              (:file "ttf-subset")
                              (:file "tounicode")))))
 
@@ -56,7 +57,8 @@
                              (:file "japanese-stress")
                              (:file "ja-pdf")
                              (:file "ruby")
-                             (:file "vertical")))))
+                             (:file "vertical")
+                             (:file "document")))))
 
 ;;; テストは芯 (kern) だけに依存する。cl-pdf も vendor も要らないので
 ;;; DLL/フォントを用意せず素の SBCL で回帰確認できる。
@@ -67,9 +69,11 @@
   :serial t
   :components ((:module "test"
                 :components ((:file "line-adjustment")
-                             (:file "ruby"))))
+                             (:file "ruby")
+                             (:file "document"))))
   :perform (test-op (o c)
              (let ((ok1 (uiop:symbol-call '#:kern '#:run-line-adjustment-tests))
-                   (ok2 (uiop:symbol-call '#:kern '#:run-ruby-tests)))
-               (unless (and ok1 ok2)
+                   (ok2 (uiop:symbol-call '#:kern '#:run-ruby-tests))
+                   (ok3 (uiop:symbol-call '#:kern '#:run-document-tests)))
+               (unless (and ok1 ok2 ok3)
                  (error "kern regression tests failed")))))

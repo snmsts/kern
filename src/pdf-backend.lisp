@@ -68,6 +68,16 @@
                          (pdf:draw-text (placed-string g))
                          (setf last-x gx last-y gy))))))))))
 
+(defun draw-document (paras font size &key (x 60) (y 780) (line-pitch (* size 17/10))
+                                           (para-gap (* size 4/5)) (direction :horizontal))
+  "段落ごとの LAID-LINE list の list (layout-document の返り値) を、段落間に
+   PARA-GAP を空けて描く。横組みは下へ、縦組みは列を左へ段落を積む。"
+  (let ((cy y) (cx x))
+    (dolist (para paras)
+      (draw-lines para font size :x cx :y cy :line-pitch line-pitch :direction direction)
+      (let ((extent (+ (* (length para) line-pitch) para-gap)))
+        (if (eq direction :vertical) (decf cx extent) (decf cy extent))))))
+
 ;;; --- フォントのサブセット化を cl-pdf に差し込む ---
 
 (defun gids-for-codes (fm codes)

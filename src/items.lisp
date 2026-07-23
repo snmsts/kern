@@ -21,7 +21,8 @@
            #:stretch-priority #:shrink-priority #:glue-ratio
            #:penalty #:penalty-value #:flagged-p
            #:+inf-penalty+ #:+forced-break+
-           #:make-box #:make-glue #:make-penalty #:make-glyph-box))
+           #:make-box #:make-glue #:make-penalty #:make-glyph-box
+           #:layout-document #:inline->items #:document-codes))
 
 (in-package #:kern)
 

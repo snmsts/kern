@@ -67,13 +67,29 @@ including the ground-truth comparisons under `compare/`.
 
 ## Running
 
-Needs SBCL (via [Roswell](https://github.com/roswell/roswell)) and a
-patched cl-pdf. cl-pdf is used from `vendor/cl-pdf` (the `local-fixes`
-branch) — upstream has two bugs Kern trips over; see `DESIGN.md`. The
-demos load a `.ttf` Japanese font (游明朝 by default).
+Needs SBCL (via [Roswell](https://github.com/roswell/roswell)). Two things
+live outside the repo; `setup.sh` fetches both (needs `git` and `curl`):
+
+```sh
+sh setup.sh
+```
+
+- `vendor/cl-pdf` — cl-pdf with two fixes the PDF backend needs, from the
+  [snmsts/cl-pdf](https://github.com/snmsts/cl-pdf) fork (`local-fixes`).
+  Upstream PRs [mbattyani/cl-pdf#47](https://github.com/mbattyani/cl-pdf/pull/47)
+  and [#48](https://github.com/mbattyani/cl-pdf/pull/48); once merged the
+  Quicklisp cl-pdf works and this is unnecessary. See `DESIGN.md`.
+- `vendor/jlreq/jfm-jlreq.lua` — the character-class and spacing data Kern
+  reads at run time, from [abenori/jlreq](https://github.com/abenori/jlreq)
+  (BSD-2).
+
+Neither is needed for the **core** — `(asdf:test-system "kern")` runs on a
+bare Lisp. They are only for the PDF demos, which also load a single-face
+`.ttf` Japanese font (游明朝 by default; switchable, see below).
 
 ```lisp
-;; load everything and run a demo
+;; fetch vendor deps once: sh setup.sh
+;; then load everything and run a demo
 ros run -- --load load.lisp
 (kern::run-document-pdf)           ; the horizontal document above
 (kern::run-vertical-document-pdf)  ; the same, vertical

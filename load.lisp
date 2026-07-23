@@ -20,7 +20,7 @@
   (pushnew here asdf:*central-registry* :test #'equal)
   (pushnew (merge-pathnames "vendor/cl-pdf/" here) asdf:*central-registry* :test #'equal)
   (unless (probe-file (merge-pathnames "vendor/cl-pdf/cl-pdf.asd" here))
-    (warn "vendor/cl-pdf が無い。~%  git clone https://github.com/mbattyani/cl-pdf.git vendor/cl-pdf~%  そのうえで DESIGN.md のパッチ2本を当てること。")))
+    (warn "vendor/cl-pdf が無い。sh setup.sh で vendor を取得すること~%  (cl-pdf = snmsts/cl-pdf の local-fixes、jfm-jlreq.lua = abenori/jlreq)。")))
 
 (asdf:load-system "kern/demo")
 

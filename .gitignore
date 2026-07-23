@@ -20,3 +20,5 @@ demo/out-lines.txt
 
 # レンダリング成果物 (gs で PDF→PNG した目視確認用)
 *.png
+# README の showcase 画像だけは追跡する
+!docs/*.png

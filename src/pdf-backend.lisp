@@ -68,15 +68,19 @@
                          (pdf:draw-text (placed-string g))
                          (setf last-x gx last-y gy))))))))))
 
-(defun draw-document (paras font size &key (x 60) (y 780) (line-pitch (* size 17/10))
-                                           (para-gap (* size 4/5)) (direction :horizontal))
-  "段落ごとの LAID-LINE list の list (layout-document の返り値) を、段落間に
-   PARA-GAP を空けて描く。横組みは下へ、縦組みは列を左へ段落を積む。"
-  (let ((cy y) (cx x))
-    (dolist (para paras)
-      (draw-lines para font size :x cx :y cy :line-pitch line-pitch :direction direction)
-      (let ((extent (+ (* (length para) line-pitch) para-gap)))
-        (if (eq direction :vertical) (decf cx extent) (decf cy extent))))))
+(defun draw-document (blocks font &key (x 60) (y 780) (direction :horizontal))
+  "LAID-BLOCK の list (layout-document の返り値) を描く。ブロックは各自の級数・行送り・
+   前後アキを持つ (見出しは大きく・前後を空ける)。横組みは下へ、縦組みは列を左へ積む。"
+  (flet ((advance (amt cx cy) (if (eq direction :vertical)
+                                  (values (- cx amt) cy)
+                                  (values cx (- cy amt)))))
+    (let ((cx x) (cy y))
+      (dolist (b blocks)
+        (multiple-value-setq (cx cy) (advance (lb-before b) cx cy))   ; 前アキ
+        (draw-lines (lb-lines b) font (lb-size b)
+                    :x cx :y cy :line-pitch (lb-pitch b) :direction direction)
+        (multiple-value-setq (cx cy)
+          (advance (+ (* (length (lb-lines b)) (lb-pitch b)) (lb-after b)) cx cy))))))
 
 ;;; --- フォントのサブセット化を cl-pdf に差し込む ---
 

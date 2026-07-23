@@ -26,7 +26,18 @@
   (la-check (equal (document-options '(:document (:size 12) (:p "x"))) '(:size 12)) "opts あり")
   (la-check (null  (document-options '(:document (:p "x")))) "opts 省略")
   (la-check= (length (document-blocks '(:document (:size 12) (:p "a") (:p "b")))) 2 "blocks 数 (opts 有)")
-  (la-check= (length (document-blocks '(:document (:p "a") (:p "b")))) 2 "blocks 数 (opts 無)"))
+  (la-check= (length (document-blocks '(:document (:p "a") (:p "b")))) 2 "blocks 数 (opts 無)")
+  ;; 見出しブロック (:h1/:h2) も block-heads・codes 収集に含まれる。
+  (let ((doc '(:document (:h1 "見出し") (:p "本文"))))
+    (la-check= (length (document-blocks doc)) 2 "見出し+段落=2ブロック")
+    (la-check (equal (coerce (document-codes doc) 'list) (codes-of "見出し本文"))
+              "見出しのコードも収集"))
+  ;; block-style: 見出しは本文より大きく前後アキがある。
+  (multiple-value-bind (ps pp pb pa) (block-style :p 12)
+    (declare (ignore pp))
+    (la-check= ps 12 ":p 級数=本文") (la-check= pb 0 ":p 前アキ0") (la-check= pa 0 ":p 後アキ0"))
+  (multiple-value-bind (h1s) (block-style :h1 10)
+    (la-check (> h1s 10) ":h1 は本文より大きい")))
 
 (defun run-document-tests ()
   "B 層パース部の回帰テスト。全通過なら T。"

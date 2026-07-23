@@ -76,6 +76,10 @@ ros run -- --load load.lisp
 (kern::run-document-pdf)           ; the horizontal document above
 (kern::run-vertical-document-pdf)  ; the same, vertical
 (kern::run-ja-pdf)                 ; a longer justified sample
+
+;; fonts are pluggable — the engine only ever asks a font for metrics
+;; through generic functions, so any single-face .ttf works:
+(kern::run-document-pdf :ttf #P"/path/to/another.ttf")
 ```
 
 Tests need only the core — no cl-pdf, no fonts:

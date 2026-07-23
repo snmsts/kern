@@ -28,17 +28,20 @@
   "縦書き文書のサンプル。同じ S 式に :direction :vertical を足すだけ。
    縦ルビ (親の右) が座標写像でそのまま出るかの試験も兼ねる。")
 
-(defun run-document-pdf (&key (doc *sample-doc*) (out (rel "demo/document.pdf")))
-  "S 式文書を組んで PDF に描く。B 層の端から端まで。:direction は文書 opts から。"
-  (let* ((fm     (pdf:load-ttf-font *ttf*))
+(defun run-document-pdf (&key (doc *sample-doc*) (out (rel "demo/document.pdf")) (ttf *ttf*))
+  "S 式文書を組んで PDF に描く。B 層の端から端まで。:direction は文書 opts から。
+   :ttf で組むフォントを差し替えられる (単体 .ttf。既定は游明朝)。エンジンは総称関数の
+   協定越しにしか触らないので、cl-pdf が読める TTF なら何でも差し替わる。"
+  (let* ((fm     (pdf:load-ttf-font ttf))
          (font   (pdf:get-font (pdf::font-name fm)))
          (dir    (getf (document-options doc) :direction :horizontal))
          (blocks (layout-document doc font))
          (codes  (document-codes doc)))
     (format t "~&=== B 層 (S 式文書) デモ [~a] ===~%" dir)
+    (format t "  フォント : ~a~%" (pdf::font-name fm))
     (format t "  ブロック : ~d  各行数 ~{~d~^ ~}~%"
             (length blocks) (mapcar (lambda (b) (length (lb-lines b))) blocks))
-    (install-subset fm *ttf* codes)
+    (install-subset fm ttf codes)
     (pdf:with-document ()
       (pdf:with-page ()
         ;; 縦組みは右上から列を左へ。横組みは左上から行を下へ。
@@ -48,6 +51,6 @@
     (format t "  PDF      : ~a (~:d bytes)~%" out
             (with-open-file (in out :element-type '(unsigned-byte 8)) (file-length in)))))
 
-(defun run-vertical-document-pdf ()
+(defun run-vertical-document-pdf (&key (ttf *ttf*))
   "縦書き文書デモ。*sample-doc* と同じ B 層で :direction :vertical だけ違う。"
-  (run-document-pdf :doc *vertical-doc* :out (rel "demo/document-v.pdf")))
+  (run-document-pdf :doc *vertical-doc* :out (rel "demo/document-v.pdf") :ttf ttf))
